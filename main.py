@@ -17,6 +17,7 @@ main.py
 """
 
 import os
+import queue
 import requests
 import threading
 import datetime
@@ -244,17 +245,35 @@ def report_emotion(emotion: dict) -> None:
         print(f"⚠️  감정 기록 실패: {e}")
 
 
-def report_conversation(active: bool) -> None:
-    """대화 시작(True)/종료(False)를 서버에 알린다(앱의 '대화중' 표시용)."""
+# 대화중 보고 대기열. 웨이크워드 직후에 보내는 신호라 녹음 시작을 막으면 안 되고,
+# 시작/종료가 뒤집혀 도착하면 앱이 계속 '대화중'으로 남는다. 그래서 한 줄로 세워 보낸다.
+_conversation_queue: "queue.Queue[bool]" = queue.Queue()
+
+
+def send_conversation(active: bool) -> None:
+    """대화 시작/종료를 서버에 바로 보낸다(응답을 기다린다)."""
     try:
         requests.patch(
             f"{REMORY_API}/devices/{DEVICE_ID}/conversation",
             json={"active": active},
-            headers={"X-Device-Token": DEVICE_TOKEN},
-            timeout=30,
+            headers={"X-Device-Token": DEVICE_TOKEN}, timeout=10,
         )
     except Exception as e:
         print(f"⚠️  대화상태 보고 실패: {e}")
+
+
+def conversation_worker() -> None:
+    """대기열에 쌓인 대화 시작/종료 보고를 들어온 순서대로 서버에 보낸다."""
+    while True:
+        send_conversation(_conversation_queue.get())
+
+
+def report_conversation(active: bool) -> None:
+    """대화 시작(True)/종료(False)를 서버에 알린다(앱의 '대화중' 표시용).
+
+    네트워크가 느려도 어르신 말을 놓치지 않도록, 대기열에 넣고 바로 돌아온다.
+    """
+    _conversation_queue.put(active)
 
 
 def medication_worker(face=None) -> None:
@@ -514,6 +533,9 @@ def main() -> None:
         except Exception as e:
             print(f"⚠️  표정 디스플레이 비활성화: {e}")
 
+    # 💬 대화중 보고 워커 (웨이크워드 직후 보고가 녹음을 막지 않게 따로 보낸다)
+    threading.Thread(target=conversation_worker, daemon=True).start()
+
     # 시작 시엔 '대화중' 아님으로 맞춰둔다(이전 실행이 켜둔 채 죽었을 수 있으므로).
     report_conversation(False)
 
@@ -646,7 +668,6 @@ def main() -> None:
 
         except KeyboardInterrupt:
             print("\n👋 종료")
-            report_conversation(False)
             break
         except Exception as e:
             consecutive_errors += 1
@@ -656,6 +677,10 @@ def main() -> None:
                 break
             time.sleep(0.5)
             continue
+
+    # 어떤 이유로 멈추든 앱에 '대화중'이 남지 않게 한다.
+    # 곧 프로세스가 끝나므로 대기열 대신 직접 보낸다.
+    send_conversation(False)
 
     if emotion_svc:
         emotion_svc.close()
