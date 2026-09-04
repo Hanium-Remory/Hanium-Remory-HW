@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>모리 얼굴</title>
+<style>
+  html,body{margin:0;height:100%;background:#0e1216;overflow:hidden;cursor:none;}
+  #face{position:fixed;inset:0;width:100vw;height:100vh;}
+  /* 가족 사진 오버레이 — 표시될 때만 얼굴 위를 덮는다 */
+  #photo{position:fixed;inset:0;width:100vw;height:100vh;object-fit:contain;
+         background:#000;display:none;z-index:10;}
+</style>
+</head>
+<body>
+  <svg id="face" viewBox="0 0 420 270" preserveAspectRatio="xMidYMid meet">
+    <g id="zzz" font-weight="600" text-anchor="middle" font-family="sans-serif">
+      <text id="z0" opacity="0">Z</text><text id="z1" opacity="0">Z</text><text id="z2" opacity="0">Z</text>
+    </g>
+    <g id="ink">
+      <path id="eyeLpath"/><path id="eyeRpath"/>
+      <path id="archL" fill="none" stroke-width="15" stroke-linecap="round" opacity="0"/>
+      <path id="archR" fill="none" stroke-width="15" stroke-linecap="round" opacity="0"/>
+      <path id="mouthLine" fill="none" stroke-width="9" stroke-linecap="round"/>
+      <ellipse id="mouthOpen" cx="210" cy="214" rx="24" ry="0" opacity="0"/>
+    </g>
+  </svg>
+
+  <!-- 가족이 보낸 사진 (평소엔 숨김) -->
+  <img id="photo" alt="">
+
+<script>
+(function(){
+  var WS_URL = "ws://localhost:8765";   // 같은 파이면 localhost, 별도 화면이면 ws://<파이IP>:8765
+
+  // main.py 의 표정 라벨(기쁨/슬픔/위로/경청/놀람/평온) 그대로 키로 사용. (+수면: 야간/휴식용)
+  var E={
+    "평온":{eyeScaleY:1.00,inner:0.00,outer:0.00,happy:0.00,gazeY: 0.00,smile: 0.12,mouthOpen:0.04,tilt:0,sleep:0,col:[255,228,196],kick:0.6},
+    "기쁨":{eyeScaleY:1.00,inner:0.00,outer:0.00,happy:1.00,gazeY:-0.02,smile: 0.80,mouthOpen:0.08,tilt:0,sleep:0,col:[255,213,150],kick:0.9},
+    "슬픔":{eyeScaleY:0.88,inner:0.00,outer:0.28,happy:0.00,gazeY: 0.12,smile:-0.22,mouthOpen:0.04,tilt:0,sleep:0,col:[190,208,240],kick:0.5},
+    "위로":{eyeScaleY:0.66,inner:0.00,outer:0.00,happy:0.00,gazeY: 0.00,smile: 0.45,mouthOpen:0.04,tilt:7,sleep:0,col:[255,194,174],kick:0.6},
+    "경청":{eyeScaleY:1.04,inner:0.00,outer:0.00,happy:0.00,gazeY:-0.02,smile: 0.18,mouthOpen:0.05,tilt:4,sleep:0,col:[196,232,222],kick:0.7},
+    "놀람":{eyeScaleY:1.22,inner:0.00,outer:0.00,happy:0.00,gazeY:-0.05,smile: 0.20,mouthOpen:0.18,tilt:0,sleep:0,col:[182,236,220],kick:0.9},
+    "수면":{eyeScaleY:0.40,inner:0.00,outer:0.00,happy:1.00,gazeY: 0.04,smile: 0.08,mouthOpen:0.03,tilt:0,sleep:1,col:[206,186,162],kick:0.3}
+  };
+  var keys=["eyeScaleY","inner","outer","happy","gazeY","smile","mouthOpen","tilt","sleep"];
+  var cur={},vel={},tgt={};keys.forEach(function(k){cur[k]=E["평온"][k];vel[k]=0;tgt[k]=E["평온"][k];});
+  cur.col=E["평온"].col.slice(); tgt.col=E["평온"].col.slice();
+  var pop=1,vpop=0;
+  var speaking=false,speakAmt=0,speechEnv=0,sylTarget=0,nextSyl=0;
+  var blink=0,blinkTgt=0,igX=0,igY=0,igXt=0,igYt=0,t0=performance.now();
+
+  function setEmotion(n){var p=E[n];if(!p)return;keys.forEach(function(k){tgt[k]=p[k];});tgt.col=p.col.slice();vpop+=p.kick;}
+
+  // ── 가족 사진 표시/숨김 ──
+  function showPhoto(url){var el=document.getElementById("photo");if(!el||!url)return;el.src=url;el.style.display="block";}
+  function hidePhoto(){var el=document.getElementById("photo");if(!el)return;el.style.display="none";el.removeAttribute("src");}
+
+  window.Mori={setEmotion:setEmotion, speakStart:function(){speaking=true;}, speakStop:function(){speaking=false;},
+               showPhoto:showPhoto, hidePhoto:hidePhoto};
+
+  // WebSocket 제어 채널 (파이썬 FaceDisplay 가 명령을 보냄)
+  function connect(){
+    var ws;try{ws=new WebSocket(WS_URL);}catch(e){setTimeout(connect,2000);return;}
+    ws.onmessage=function(ev){var m;try{m=JSON.parse(ev.data);}catch(e){return;}
+      if(m.cmd==="emotion")setEmotion(m.name);
+      else if(m.cmd==="speak_start")speaking=true;
+      else if(m.cmd==="speak_stop")speaking=false;
+      else if(m.cmd==="photo")showPhoto(m.url);
+      else if(m.cmd==="photo_hide")hidePhoto();};
+    ws.onclose=function(){setTimeout(connect,2000);};
+    ws.onerror=function(){try{ws.close();}catch(e){}};
+  }
+  connect();
+
+  var ECL={x:150,y:116},ECR={x:270,y:116},HW=38,HH=52,R=14;
+  var MX0=176,MX1=244,MID=210,MY=214,CX=210,CY=160;
+  function spring(k,dt){var a=120*(tgt[k]-cur[k])-16*vel[k];vel[k]+=a*dt;cur[k]+=vel[k]*dt;}
+  function eyePath(cx,cy,hh,tlY,trY){var x0=cx-HW,x1=cx+HW,yb=cy+hh,r=Math.min(R,hh*0.6);
+    return "M"+(x0+r)+","+tlY+" L"+(x1-r)+","+trY+" Q"+x1+","+trY+" "+x1+","+(trY+r)+" L"+x1+","+(yb-r)+
+      " Q"+x1+","+yb+" "+(x1-r)+","+yb+" L"+(x0+r)+","+yb+" Q"+x0+","+yb+" "+x0+","+(yb-r)+
+      " L"+x0+","+(tlY+r)+" Q"+x0+","+tlY+" "+(x0+r)+","+tlY+" Z";}
+  function archPath(cx,cy,hh){return "M"+(cx-HW)+","+(cy+hh*0.35)+" Q"+cx+","+(cy-hh*0.95)+" "+(cx+HW)+","+(cy+hh*0.35);}
+  function set(id,a,v){document.getElementById(id).setAttribute(a,v);}
+  var ZA=[{x:292,y:78,s:17},{x:312,y:58,s:23},{x:334,y:36,s:31}];
+  var lastBlink=performance.now()+2000,lastSac=performance.now()+1200,prev=performance.now();
+
+  function frame(now){
+    var dt=Math.min(0.033,(now-prev)/1000);prev=now;
+    keys.forEach(function(k){spring(k,dt);});
+    blink+=(blinkTgt-blink)*0.32;igX+=(igXt-igX)*0.16;igY+=(igYt-igY)*0.16;
+    var cf=Math.min(1,dt*5);for(var i=0;i<3;i++)cur.col[i]+=(tgt.col[i]-cur.col[i])*cf;
+    var pa=150*(1-pop)-17*vpop;vpop+=pa*dt;pop+=vpop*dt;
+
+    // 말하기: 파이썬이 오디오를 재생하는 동안 speaking=true → 입 움직임 시뮬레이션
+    speakAmt+=((speaking?1:0)-speakAmt)*0.16;
+    if(speaking){if(now>nextSyl){var c=Math.random()<0.16;sylTarget=c?0.02:(0.3+Math.random()*0.62);nextSyl=now+150+Math.random()*120;}
+      var rt=(sylTarget>speechEnv)?0.34:0.18;speechEnv+=(sylTarget-speechEnv)*rt;}
+    else{speechEnv+=(0-speechEnv)*0.16;}
+
+    var sleepy=Math.max(0,cur.sleep);
+    if(now>lastBlink){if(sleepy<0.5){blinkTgt=1;setTimeout(function(){blinkTgt=0;},110);}lastBlink=now+3500+Math.random()*3000;}
+    if(now>lastSac){var g=(1-sleepy);igXt=(Math.random()*2-1)*6*g;igYt=(Math.random()*2-1)*3*g;lastSac=now+1800+Math.random()*1800;}
+    var breathe=Math.sin((now-t0)/1000*(sleepy>0.5?0.7:1.1))*0.018*(1+sleepy*0.8);
+
+    document.getElementById("ink").setAttribute("transform",
+      "translate("+CX+" "+CY+") rotate("+cur.tilt+") scale("+pop+") translate("+(-CX)+" "+(-CY)+")");
+
+    var hh=Math.max(2,HH*(cur.eyeScaleY+breathe)*(1-blink));
+    var gx=igX,gy=cur.gazeY*22+igY,he=Math.max(0,Math.min(1,cur.happy));
+    [["L",ECL],["R",ECR]].forEach(function(p){var s=p[0],c=p[1],cx=c.x+gx,cy=c.y+gy;
+      var inCut=cur.inner*1.25*hh,outCut=cur.outer*1.25*hh,top=cy-hh;
+      var tlY=(s==="L")?top+outCut:top+inCut,trY=(s==="L")?top+inCut:top+outCut;
+      set("eye"+s+"path","d",eyePath(cx,cy,hh,tlY,trY));set("eye"+s+"path","opacity",1-he);
+      set("arch"+s,"d",archPath(cx,cy,hh));set("arch"+s,"opacity",he);});
+
+    var renderOpen=cur.mouthOpen*(1-speakAmt)+speechEnv*speakAmt;
+    var endY=MY-cur.smile*10,ctrlY=MY+cur.smile*16;
+    set("mouthLine","d","M"+MX0+","+endY+" Q"+MID+","+ctrlY+" "+MX1+","+endY);
+    var openF=Math.max(0,Math.min(1,(renderOpen-0.06)/0.18));set("mouthLine","opacity",1-openF);
+    var ry=5+renderOpen*20;set("mouthOpen","ry",ry);set("mouthOpen","cy",MY+ry);set("mouthOpen","opacity",openF);
+
+    var r=Math.round(cur.col[0]),g2=Math.round(cur.col[1]),bl=Math.round(cur.col[2]),col="rgb("+r+","+g2+","+bl+")";
+    ["eyeLpath","eyeRpath","mouthOpen"].forEach(function(id){set(id,"fill",col);});
+    ["archL","archR","mouthLine"].forEach(function(id){set(id,"stroke",col);});
+    document.getElementById("ink").style.filter="drop-shadow(0 0 13px rgba("+r+","+g2+","+bl+",.4))";
+
+    for(var zi=0;zi<3;zi++){var a=ZA[zi],ph=((now/1700)+zi*0.33)%1,zt=document.getElementById("z"+zi);
+      zt.setAttribute("x",a.x);zt.setAttribute("y",a.y-ph*15);zt.setAttribute("font-size",a.s);
+      zt.setAttribute("fill",col);zt.setAttribute("opacity",(Math.sin(ph*Math.PI)*sleepy).toFixed(3));}
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
