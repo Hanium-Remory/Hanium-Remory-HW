@@ -50,6 +50,8 @@ DEVICE_ID     = os.getenv("DEVICE_ID", "1")
 DEVICE_TOKEN  = os.getenv("DEVICE_TOKEN", "Fy5JbTV4OFZ9eq6cwoF7cD8IMe1_0aG6le0y0lF1fAM")
 # 약 시간을 몇 초마다 확인할지.
 MEDICATION_CHECK_INTERVAL_SEC = 30
+# 약 알림 후 몇 초 뒤에 "드셨어요?" 하고 복용을 다시 챙겨줄지(기본 15분).
+MED_CONFIRM_DELAY_SEC = 15 * 60
 # 하트비트('살아있음' 신호)를 몇 초마다 보낼지. 서버는 600초 넘게 끊기면 '연결 끊김'으로 본다.
 HEARTBEAT_INTERVAL_SEC = 300
 # 서버에서 볼륨·방해금지를 몇 초마다 읽어올지
@@ -63,7 +65,8 @@ RAG_SYNC_INTERVAL_SEC = 300
 # 스피커 볼륨 조절용 ALSA 컨트롤 이름 (amixer scontrols 로 확인)
 AUDIO_CONTROL = os.getenv("AUDIO_CONTROL", "PCM")
 # 서버에서 읽어온 최신 설정 캐시
-device_settings = {"dnd": None, "volume": None}
+# spk_id: 기본 목소리의 화자 id(등록한 가족 음성). None 이면 서버 기본 목소리로 말함.
+device_settings = {"dnd": None, "volume": None, "spk_id": None}
 # 대화 TTS·약 알림·채팅 음성이 동시에 스피커로 나가지 않도록 하는 잠금.
 speaker_lock = threading.Lock()
 # 사용자가 말하는 중(녹음)인지. 채팅 알림을 이 동안엔 미룬다(그 턴 끝나면 전달).
@@ -73,7 +76,7 @@ recording = threading.Event()
 MIC_DEVICE_INDEX = None
 
 WAKEWORD_DEVICE_INDEX = None
-WAKEWORD_THRESHOLD = 0.3
+WAKEWORD_THRESHOLD = 0.65
 
 CONVERSATION_IDLE_TIMEOUT_SEC = 15
 
@@ -211,8 +214,12 @@ def chat_with_memory(client: Groq, user_text: str, context: str,
 
 
 def speak(text: str) -> None:
-    """CosyVoice2 스트리밍 TTS(8001)로 문장을 말한다. 약알림·채팅 안내 공용."""
-    synthesize_and_play_stream(text, TTS_STREAM_API_URL, TTS_API_KEY)
+    """CosyVoice2 스트리밍 TTS(8001)로 문장을 말한다. 약알림·채팅 안내 공용.
+
+    기본 목소리로 지정된 화자(device_settings["spk_id"])로 말한다. None 이면 서버 기본.
+    """
+    synthesize_and_play_stream(text, TTS_STREAM_API_URL, TTS_API_KEY,
+                               spk_id=device_settings.get("spk_id"))
 
 
 def heartbeat_worker() -> None:
@@ -276,6 +283,23 @@ def report_conversation(active: bool) -> None:
     _conversation_queue.put(active)
 
 
+def _speak_when_free(text: str, face=None) -> None:
+    """어르신이 말하는 중이면 그 턴이 끝나길 기다렸다가 음성으로 안내한다."""
+    while recording.is_set():
+        time.sleep(0.3)
+    with speaker_lock:
+        if face:
+            face.set_expression("평온")
+        speak(text)
+
+
+def _confirm_medication(med_name: str, face=None) -> None:
+    """약 알림 MED_CONFIRM_DELAY_SEC 후, 복용했는지 한 번 더 챙겨 묻는다(대답은 안 받음)."""
+    _speak_when_free(
+        f"{med_name} 드셨어요? 아직 안 드셨으면 지금 꼭 챙겨 드세요.", face
+    )
+
+
 def medication_worker(face=None) -> None:
     """백그라운드에서 약 복용 시간을 지켜보다가 때가 되면 음성으로 안내한다."""
     headers = {"X-Device-Token": DEVICE_TOKEN}
@@ -291,27 +315,33 @@ def medication_worker(face=None) -> None:
                 headers=headers, timeout=30,
             )
             data = r.json().get("data", {})
+            med_check = data.get("medicationCheck", True)   # 15분 뒤 복용 확인을 할지
 
-            if data.get("medicationCheck", True):
-                for m in data.get("medications", []):
-                    key = (m["medicationId"], today)
-                    if m.get("enabled") and m["time"] == hhmm and key not in alerted:
-                        alerted.add(key)
+            for m in data.get("medications", []):
+                key = (m["medicationId"], today)
+                if m.get("enabled") and m["time"] == hhmm and key not in alerted:
+                    alerted.add(key)
+                    timing = (m.get("timing") or "").strip()
+                    if timing:
+                        text = f"{timing}에 {m['name']} 드실 시간이에요. 잊지 말고 꼭 챙겨 드세요."
+                    else:
                         text = f"{m['name']} 드실 시간이에요. 잊지 말고 꼭 챙겨 드세요."
-                        while recording.is_set():
-                            time.sleep(0.3)
-                        with speaker_lock:
-                            if face:
-                                face.set_expression("평온")
-                            speak(text)
-                        try:
-                            requests.post(
-                                f"{REMORY_API}/devices/{DEVICE_ID}/activities",
-                                json={"activityType": "복약알림", "content": m["name"]},
-                                headers=headers, timeout=30,
-                            )
-                        except Exception as e:
-                            print(f"⚠️  복약 활동 기록 실패: {e}")
+                    _speak_when_free(text, face)
+                    try:
+                        requests.post(
+                            f"{REMORY_API}/devices/{DEVICE_ID}/activities",
+                            json={"activityType": "복약알림", "content": m["name"]},
+                            headers=headers, timeout=30,
+                        )
+                    except Exception as e:
+                        print(f"⚠️  복약 활동 기록 실패: {e}")
+
+                    # 복용 확인이 켜져 있으면 15분 뒤에 한 번 더 챙겨 묻는다.
+                    if med_check:
+                        threading.Timer(
+                            MED_CONFIRM_DELAY_SEC, _confirm_medication,
+                            args=(m["name"], face),
+                        ).start()
         except Exception as e:
             print(f"⚠️  약 알림 오류: {e}")
 
@@ -323,6 +353,14 @@ def _deliver_chat(m: dict, face=None) -> None:
     content = (m.get("content") or "").strip()
     image_url = m.get("imageUrl")
 
+    # 보낸 사람 호칭 만들기: "딸 박수진" → "딸 박수진에게서". 정보 없으면 "가족".
+    relation = (m.get("senderRelation") or "").strip()
+    name = (m.get("senderName") or "").strip()
+    if name:
+        sender = f"{relation} {name}".strip()   # 관계 없으면 이름만
+    else:
+        sender = "가족"
+
     # 사용자가 말하는 중이면 그 턴이 끝날 때까지 기다린다(사용자 말을 끊지 않음).
     while recording.is_set():
         time.sleep(0.3)
@@ -332,9 +370,9 @@ def _deliver_chat(m: dict, face=None) -> None:
         if face:
             face.set_expression("기쁨")
         if content:
-            speak(f"가족에게서 연락이 왔어요. {content}")
+            speak(f"{sender}에게서 메시지가 왔어요. {content}")
         if image_url:
-            speak("가족이 사진을 보냈어요. 화면을 봐 주세요.")
+            speak(f"{sender}이 사진을 보냈어요. 화면을 봐 주세요.")
         if face:
             face.set_expression("평온")
 
@@ -432,7 +470,7 @@ def in_dnd(dnd, now=None):
 
 
 def settings_worker():
-    """서버에서 볼륨·방해금지를 주기적으로 읽어 반영한다."""
+    """서버에서 볼륨·방해금지·기본 목소리(speaker_id)를 주기적으로 읽어 반영한다."""
     headers = {"X-Device-Token": DEVICE_TOKEN}
     while True:
         try:
@@ -442,6 +480,19 @@ def settings_worker():
             if vol is not None and vol != device_settings["volume"]:
                 apply_volume(vol)
                 device_settings["volume"] = vol
+
+            # 기본 목소리(defaultVoiceId)의 speaker_id 를 뽑아둔다.
+            # 인형이 TTS 할 때 이 화자로 말한다. speaker_id 가 없으면(기본 제공 음성)
+            # None → 서버 기본 목소리(caregiver)로 말함.
+            default_id = data.get("defaultVoiceId")
+            spk = None
+            for v in data.get("voices", []):
+                if v.get("voiceId") == default_id:
+                    spk = v.get("speakerId")
+                    break
+            if spk != device_settings["spk_id"]:
+                device_settings["spk_id"] = spk
+                print(f"🎙️  기본 목소리 speaker_id = {spk}")
 
             r = requests.get(f"{REMORY_API}/devices/{DEVICE_ID}/dnd", headers=headers, timeout=30)
             device_settings["dnd"] = r.json().get("data")
@@ -499,7 +550,7 @@ def main() -> None:
     stt           = STTHandler(model_size=WHISPER_MODEL)
 
     wakeword_detector = MoriyaWakeWordDetector(
-        moriya_model_path=ROOT / "models" / "moriya_v0.onnx",
+        moriya_model_path=ROOT / "models" / "moriya_v1.onnx",
         models_dir=ROOT / "models",
         threshold=WAKEWORD_THRESHOLD,
         input_device_index=WAKEWORD_DEVICE_INDEX,
@@ -547,7 +598,7 @@ def main() -> None:
     threading.Thread(target=heartbeat_worker, daemon=True).start()
     print("💓 연결 확인 시작")
 
-    # ⚙️ 설정 동기화 워커(볼륨·방해금지)
+    # ⚙️ 설정 동기화 워커(볼륨·방해금지·기본 목소리)
     threading.Thread(target=settings_worker, daemon=True).start()
     print("⚙️  설정 동기화 워커 시작")
 
@@ -645,6 +696,7 @@ def main() -> None:
                 face.set_expression(robot_expr)
 
             # ⑤⑥ TTS 스트리밍 (speaker_lock 으로 약알림·채팅과 안 겹치게)
+            #     기본 목소리로 지정된 화자(device_settings["spk_id"])로 말한다.
             try:
                 with speaker_lock:
                     with timed("TTS 스트리밍", timings):
@@ -652,6 +704,7 @@ def main() -> None:
                             reply,
                             TTS_STREAM_API_URL,
                             TTS_API_KEY,
+                            spk_id=device_settings.get("spk_id"),
                             on_start=(face.start_speaking if face else None),
                         )
             finally:

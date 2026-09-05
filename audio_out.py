@@ -116,15 +116,21 @@ def play_wav(path: str) -> None:
         ) from e
 
 
-def synthesize_and_play_stream(text, url, key, sample_rate=24000, buffer_bytes=96000, on_start=None):
-    """PCM을 백그라운드 스레드로 미리 받아 쌓아두고 재생. 네트워크 흔들림을 흡수한다."""
+def synthesize_and_play_stream(text, url, key, sample_rate=24000, buffer_bytes=96000,
+                               on_start=None, spk_id=None):
+    """PCM을 백그라운드 스레드로 미리 받아 쌓아두고 재생. 네트워크 흔들림을 흡수한다.
+
+    spk_id: 어떤 화자(목소리)로 합성할지. None 이면 서버 기본 목소리(caregiver).
+            기본 목소리로 등록한 가족 음성의 speaker_id 를 넘기면 그 목소리로 말한다.
+    """
     t0 = time.perf_counter()
     q = queue.Queue()
     box = {"ttfb": None, "dl_done": None, "err": None, "bytes": 0}
 
     def downloader():
         try:
-            with requests.post(url, headers={"x-api-key": key}, json={"text": text},
+            with requests.post(url, headers={"x-api-key": key},
+                               json={"text": text, "spk_id": spk_id},
                                stream=True, timeout=60) as r:
                 r.raise_for_status()
                 for chunk in r.iter_content(chunk_size=4096):
