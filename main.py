@@ -54,8 +54,8 @@ DEVICE_TOKEN  = os.getenv("DEVICE_TOKEN", "Fy5JbTV4OFZ9eq6cwoF7cD8IMe1_0aG6le0y0
 MEDICATION_CHECK_INTERVAL_SEC = 30
 # 약 알림 후 몇 초 뒤에 "드셨어요?" 하고 복용을 다시 챙겨줄지(기본 15분).
 MED_CONFIRM_DELAY_SEC = 15 * 60
-# 하트비트('살아있음' 신호)를 몇 초마다 보낼지. 서버는 600초 넘게 끊기면 '연결 끊김'으로 본다.
-HEARTBEAT_INTERVAL_SEC = 300
+# 연결 신호를 몇 초마다 보낼지. 서버는 600초 넘게 끊기면 '연결 끊김'으로 본다.
+CONNECTION_INTERVAL_SEC = 300
 # 서버에서 볼륨·방해금지를 몇 초마다 읽어올지
 SETTINGS_SYNC_INTERVAL_SEC = 60
 # 가족 채팅을 몇 초마다 확인할지
@@ -263,8 +263,8 @@ def speak(text: str) -> None:
                                spk_id=device_settings.get("spk_id"))
 
 
-def heartbeat_worker() -> None:
-    """주기적으로 '인형이 살아있음'을 서버에 알린다."""
+def connection_worker() -> None:
+    """주기적으로 '인형이 연결되어 있음'을 서버에 알린다."""
     headers = {"X-Device-Token": DEVICE_TOKEN}
     while True:
         try:
@@ -274,7 +274,7 @@ def heartbeat_worker() -> None:
             )
         except Exception as e:
             print(f"⚠️  서버 연결 확인 실패: {e}")
-        time.sleep(HEARTBEAT_INTERVAL_SEC)
+        time.sleep(CONNECTION_INTERVAL_SEC)
 
 
 def report_emotion(emotion: dict) -> None:
@@ -790,7 +790,7 @@ def main() -> None:
     print("💊 약 알림 워커 시작")
 
     # 💓 서버 연결 확인 워커
-    threading.Thread(target=heartbeat_worker, daemon=True).start()
+    threading.Thread(target=connection_worker, daemon=True).start()
     print("💓 연결 확인 시작")
 
     # ⚙️ 설정 동기화 워커(볼륨·방해금지·기본 목소리)
