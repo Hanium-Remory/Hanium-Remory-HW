@@ -19,12 +19,8 @@
     </g>
     <!-- 듣는 중 표시. 웨이크워드를 알아들었는지 멀리서도 보이게 한다. -->
     <g id="wake" opacity="0">
-      <!-- 테두리는 '켜져 있다' 는 기척만 준다. 눈에 띄는 쪽은 전구다. -->
-      <rect id="wakeRing" x="5" y="5" width="410" height="260" rx="24"
-            fill="none" stroke-width="2" stroke-opacity="0.3"/>
-      <g id="wakeRays" stroke-width="3.5" stroke-linecap="round"/>
-      <circle id="wakeBulb" cx="366" cy="44" r="10"/>
-      <rect id="wakeBase" x="360" y="55" width="12" height="5" rx="2"/>
+      <circle id="wakeBulb" cx="378" cy="36" r="7"/>
+      <rect id="wakeBase" x="373.5" y="44" width="9" height="4" rx="1.5"/>
     </g>
 
     <g id="ink">
@@ -106,19 +102,6 @@
   var ZA=[{x:292,y:78,s:17},{x:312,y:58,s:23},{x:334,y:36,s:31}];
   var lastBlink=performance.now()+2000,lastSac=performance.now()+1200,prev=performance.now();
 
-  // 전구에서 퍼지는 빛줄기. 위쪽 반원으로만 뻗게 해서 얼굴을 가리지 않는다.
-  var BULB={x:366,y:44};
-  (function(){
-    var g=document.getElementById("wakeRays"),frag="";
-    for(var i=0;i<8;i++){
-      var a=Math.PI*(1.15+i*0.10);           // 왼쪽 위 ~ 오른쪽 위
-      var x0=BULB.x+Math.cos(a)*16,y0=BULB.y+Math.sin(a)*16;
-      var x1=BULB.x+Math.cos(a)*25,y1=BULB.y+Math.sin(a)*25;
-      frag+='<line x1="'+x0.toFixed(1)+'" y1="'+y0.toFixed(1)+
-            '" x2="'+x1.toFixed(1)+'" y2="'+y1.toFixed(1)+'"/>';
-    }
-    g.innerHTML=frag;
-  })();
 
   function frame(now){
     var dt=Math.min(0.033,(now-prev)/1000);prev=now;
@@ -142,13 +125,8 @@
       var pulse=0.62+0.38*Math.sin((now-t0)/1000*3.4);
       var wakeA=Math.min(1,listenAmt*pulse+wakePop);
       wakeG.setAttribute("opacity",wakeA.toFixed(3));
-      wakeG.style.filter="drop-shadow(0 0 "+(6+10*wakeA).toFixed(1)+"px rgba("+WAKE_COL+",.75))";
-      // 테두리는 번쩍일 때만 아주 조금 도드라진다.
-      set("wakeRing","stroke-width",(1.8+1.0*wakeA).toFixed(2));
-      set("wakeRing","stroke-opacity",(0.22+0.16*wakeA).toFixed(3));
     }else if(wakeG.getAttribute("opacity")!=="0"){
       wakeG.setAttribute("opacity","0");
-      wakeG.style.filter="none";
     }
 
     var sleepy=Math.max(0,cur.sleep);
@@ -178,7 +156,6 @@
     ["archL","archR","mouthLine"].forEach(function(id){set(id,"stroke",col);});
     var wc="rgb("+WAKE_COL+")";
     ["wakeBulb","wakeBase"].forEach(function(id){set(id,"fill",wc);});
-    ["wakeRing","wakeRays"].forEach(function(id){set(id,"stroke",wc);});
     document.getElementById("ink").style.filter="drop-shadow(0 0 13px rgba("+r+","+g2+","+bl+",.4))";
 
     for(var zi=0;zi<3;zi++){var a=ZA[zi],ph=((now/1700)+zi*0.33)%1,zt=document.getElementById("z"+zi);
