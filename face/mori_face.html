@@ -19,11 +19,12 @@
     </g>
     <!-- 듣는 중 표시. 웨이크워드를 알아들었는지 멀리서도 보이게 한다. -->
     <g id="wake" opacity="0">
+      <!-- 테두리는 '켜져 있다' 는 기척만 준다. 눈에 띄는 쪽은 전구다. -->
       <rect id="wakeRing" x="5" y="5" width="410" height="260" rx="24"
-            fill="none" stroke-width="4"/>
+            fill="none" stroke-width="2" stroke-opacity="0.3"/>
       <g id="wakeRays" stroke-width="3.5" stroke-linecap="round"/>
-      <circle id="wakeBulb" cx="210" cy="32" r="10"/>
-      <rect id="wakeBase" x="204" y="43" width="12" height="5" rx="2"/>
+      <circle id="wakeBulb" cx="366" cy="44" r="10"/>
+      <rect id="wakeBase" x="360" y="55" width="12" height="5" rx="2"/>
     </g>
 
     <g id="ink">
@@ -106,7 +107,7 @@
   var lastBlink=performance.now()+2000,lastSac=performance.now()+1200,prev=performance.now();
 
   // 전구에서 퍼지는 빛줄기. 위쪽 반원으로만 뻗게 해서 얼굴을 가리지 않는다.
-  var BULB={x:210,y:32};
+  var BULB={x:366,y:44};
   (function(){
     var g=document.getElementById("wakeRays"),frag="";
     for(var i=0;i<8;i++){
@@ -141,9 +142,10 @@
       var pulse=0.62+0.38*Math.sin((now-t0)/1000*3.4);
       var wakeA=Math.min(1,listenAmt*pulse+wakePop);
       wakeG.setAttribute("opacity",wakeA.toFixed(3));
-      wakeG.style.filter="drop-shadow(0 0 "+(8+18*wakeA).toFixed(1)+"px rgba("+WAKE_COL+",.9))";
-      // 번쩍이는 순간엔 테두리도 굵어져 눈에 더 잘 띈다.
-      set("wakeRing","stroke-width",(3+3*wakeA).toFixed(2));
+      wakeG.style.filter="drop-shadow(0 0 "+(6+10*wakeA).toFixed(1)+"px rgba("+WAKE_COL+",.75))";
+      // 테두리는 번쩍일 때만 아주 조금 도드라진다.
+      set("wakeRing","stroke-width",(1.8+1.0*wakeA).toFixed(2));
+      set("wakeRing","stroke-opacity",(0.22+0.16*wakeA).toFixed(3));
     }else if(wakeG.getAttribute("opacity")!=="0"){
       wakeG.setAttribute("opacity","0");
       wakeG.style.filter="none";
