@@ -14,7 +14,7 @@
 ![Hailo](https://img.shields.io/badge/AI%20HAT%2B-Hailo--8%2026TOPS-00B5AD)
 ![Whisper](https://img.shields.io/badge/STT-Whisper--base%20.hef-412991)
 ![ONNX](https://img.shields.io/badge/WakeWord-openWakeWord%20ONNX-005CED?logo=onnx&logoColor=white)
-![Chroma](https://img.shields.io/badge/RAG-Chroma%20%2B%20ko--sroberta-FF6F00)
+![LangChain](https://img.shields.io/badge/RAG-LangChain%20%2B%20Chroma-1C3C3C?logo=langchain&logoColor=white)
 ![Groq](https://img.shields.io/badge/LLM-Groq-F55036)
 ![CosyVoice](https://img.shields.io/badge/TTS-CosyVoice2%20streaming-6E56CF)
 
