@@ -660,6 +660,10 @@ def main() -> None:
                     print("🔕 방해 금지 시간 — 조용히 대기")
                     continue
                 print("🎤 말씀하세요.")
+                if face:
+                    # 알아들었다는 걸 바로 보여준다. 소리만으로는 어르신도
+                    # 옆에서 보는 가족도 웨이크워드가 먹었는지 알 수 없다.
+                    face.set_expression("경청")
                 conversation_active = True
                 turns_this_session = 0
                 report_conversation(True)   # 웨이크워드~ = 대화중 시작
@@ -682,6 +686,8 @@ def main() -> None:
 
             # ① 마이크 라이브 녹음 (녹음 중엔 recording 플래그 ON → 채팅 알림 미룸)
             recording.set()
+            if face:
+                face.listen_start()
             try:
                 with timed("녹음+VAD", timings):
                     wav_path = recorder.record_until_silence(
@@ -692,6 +698,9 @@ def main() -> None:
                     )
             finally:
                 recording.clear()
+                # 다 들었다. 이제 생각하고 말할 차례라 불을 끈다.
+                if face:
+                    face.listen_stop()
 
             if wav_path is None:
                 print("💤 대화를 종료하고 웨이크워드 대기로 돌아갑니다.")

@@ -17,6 +17,15 @@
     <g id="zzz" font-weight="600" text-anchor="middle" font-family="sans-serif">
       <text id="z0" opacity="0">Z</text><text id="z1" opacity="0">Z</text><text id="z2" opacity="0">Z</text>
     </g>
+    <!-- 듣는 중 표시. 웨이크워드를 알아들었는지 멀리서도 보이게 한다. -->
+    <g id="wake" opacity="0">
+      <rect id="wakeRing" x="5" y="5" width="410" height="260" rx="24"
+            fill="none" stroke-width="4"/>
+      <g id="wakeRays" stroke-width="3.5" stroke-linecap="round"/>
+      <circle id="wakeBulb" cx="210" cy="32" r="10"/>
+      <rect id="wakeBase" x="204" y="43" width="12" height="5" rx="2"/>
+    </g>
+
     <g id="ink">
       <path id="eyeLpath"/><path id="eyeRpath"/>
       <path id="archL" fill="none" stroke-width="15" stroke-linecap="round" opacity="0"/>
@@ -49,6 +58,10 @@
   var pop=1,vpop=0;
   var speaking=false,speakAmt=0,speechEnv=0,sylTarget=0,nextSyl=0;
   var blink=0,blinkTgt=0,igX=0,igY=0,igXt=0,igYt=0,t0=performance.now();
+  // 듣는 중 표시. listenAmt 는 켜짐/꺼짐이 부드럽게 오가는 값이고,
+  // wakePop 은 알아들은 그 순간 한 번 번쩍이고 잦아드는 값이다.
+  var listening=false,listenAmt=0,wakePop=0;
+  var WAKE_COL="255,201,92";   // 전구색. 표정 색과 섞이지 않게 따로 둔다.
 
   function setEmotion(n){var p=E[n];if(!p)return;keys.forEach(function(k){tgt[k]=p[k];});tgt.col=p.col.slice();vpop+=p.kick;}
 
@@ -56,8 +69,13 @@
   function showPhoto(url){var el=document.getElementById("photo");if(!el||!url)return;el.src=url;el.style.display="block";}
   function hidePhoto(){var el=document.getElementById("photo");if(!el)return;el.style.display="none";el.removeAttribute("src");}
 
+  // ── 듣는 중 표시 ──
+  function listenStart(){if(!listening)wakePop=1;listening=true;}
+  function listenStop(){listening=false;}
+
   window.Mori={setEmotion:setEmotion, speakStart:function(){speaking=true;}, speakStop:function(){speaking=false;},
-               showPhoto:showPhoto, hidePhoto:hidePhoto};
+               showPhoto:showPhoto, hidePhoto:hidePhoto,
+               listenStart:listenStart, listenStop:listenStop};
 
   // WebSocket 제어 채널 (파이썬 FaceDisplay 가 명령을 보냄)
   function connect(){
@@ -67,7 +85,9 @@
       else if(m.cmd==="speak_start")speaking=true;
       else if(m.cmd==="speak_stop")speaking=false;
       else if(m.cmd==="photo")showPhoto(m.url);
-      else if(m.cmd==="photo_hide")hidePhoto();};
+      else if(m.cmd==="photo_hide")hidePhoto();
+      else if(m.cmd==="listen_start")listenStart();
+      else if(m.cmd==="listen_stop")listenStop();};
     ws.onclose=function(){setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
   }
@@ -85,6 +105,20 @@
   var ZA=[{x:292,y:78,s:17},{x:312,y:58,s:23},{x:334,y:36,s:31}];
   var lastBlink=performance.now()+2000,lastSac=performance.now()+1200,prev=performance.now();
 
+  // 전구에서 퍼지는 빛줄기. 위쪽 반원으로만 뻗게 해서 얼굴을 가리지 않는다.
+  var BULB={x:210,y:32};
+  (function(){
+    var g=document.getElementById("wakeRays"),frag="";
+    for(var i=0;i<8;i++){
+      var a=Math.PI*(1.15+i*0.10);           // 왼쪽 위 ~ 오른쪽 위
+      var x0=BULB.x+Math.cos(a)*16,y0=BULB.y+Math.sin(a)*16;
+      var x1=BULB.x+Math.cos(a)*25,y1=BULB.y+Math.sin(a)*25;
+      frag+='<line x1="'+x0.toFixed(1)+'" y1="'+y0.toFixed(1)+
+            '" x2="'+x1.toFixed(1)+'" y2="'+y1.toFixed(1)+'"/>';
+    }
+    g.innerHTML=frag;
+  })();
+
   function frame(now){
     var dt=Math.min(0.033,(now-prev)/1000);prev=now;
     keys.forEach(function(k){spring(k,dt);});
@@ -97,6 +131,23 @@
     if(speaking){if(now>nextSyl){var c=Math.random()<0.16;sylTarget=c?0.02:(0.3+Math.random()*0.62);nextSyl=now+150+Math.random()*120;}
       var rt=(sylTarget>speechEnv)?0.34:0.18;speechEnv+=(sylTarget-speechEnv)*rt;}
     else{speechEnv+=(0-speechEnv)*0.16;}
+
+    // 듣는 중 표시. 켜질 때 확 번쩍였다가(wakePop) 은은한 맥박으로 가라앉는다.
+    listenAmt+=((listening?1:0)-listenAmt)*0.18;
+    wakePop*=0.93;
+    if(wakePop<0.004)wakePop=0;
+    var wakeG=document.getElementById("wake");
+    if(listenAmt>0.004||wakePop>0){
+      var pulse=0.62+0.38*Math.sin((now-t0)/1000*3.4);
+      var wakeA=Math.min(1,listenAmt*pulse+wakePop);
+      wakeG.setAttribute("opacity",wakeA.toFixed(3));
+      wakeG.style.filter="drop-shadow(0 0 "+(8+18*wakeA).toFixed(1)+"px rgba("+WAKE_COL+",.9))";
+      // 번쩍이는 순간엔 테두리도 굵어져 눈에 더 잘 띈다.
+      set("wakeRing","stroke-width",(3+3*wakeA).toFixed(2));
+    }else if(wakeG.getAttribute("opacity")!=="0"){
+      wakeG.setAttribute("opacity","0");
+      wakeG.style.filter="none";
+    }
 
     var sleepy=Math.max(0,cur.sleep);
     if(now>lastBlink){if(sleepy<0.5){blinkTgt=1;setTimeout(function(){blinkTgt=0;},110);}lastBlink=now+3500+Math.random()*3000;}
@@ -123,6 +174,9 @@
     var r=Math.round(cur.col[0]),g2=Math.round(cur.col[1]),bl=Math.round(cur.col[2]),col="rgb("+r+","+g2+","+bl+")";
     ["eyeLpath","eyeRpath","mouthOpen"].forEach(function(id){set(id,"fill",col);});
     ["archL","archR","mouthLine"].forEach(function(id){set(id,"stroke",col);});
+    var wc="rgb("+WAKE_COL+")";
+    ["wakeBulb","wakeBase"].forEach(function(id){set(id,"fill",wc);});
+    ["wakeRing","wakeRays"].forEach(function(id){set(id,"stroke",wc);});
     document.getElementById("ink").style.filter="drop-shadow(0 0 13px rgba("+r+","+g2+","+bl+",.4))";
 
     for(var zi=0;zi<3;zi++){var a=ZA[zi],ph=((now/1700)+zi*0.33)%1,zt=document.getElementById("z"+zi);
