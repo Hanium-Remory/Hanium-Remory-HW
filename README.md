@@ -272,19 +272,19 @@ python test_safety.py
 
 모든 요청에 `X-Device-Token` 헤더를 붙입니다.
 
-| | 엔드포인트 | 언제 |
+| 방향 | 엔드포인트 | 언제 |
 |---|---|---|
-| 🡅 | `PATCH /devices/{id}/heartbeat` | 5분마다 |
-| 🡅 | `PATCH /devices/{id}/conversation` | 대화 시작/종료 |
-| 🡅 | `POST /devices/{id}/emotions` | 발화마다 감정 라벨 |
-| 🡅 | `POST /devices/{id}/activities` | 약 알림 등 활동 기록 |
-| 🡅 | `POST /devices/{id}/utterances` | 대화 한 턴 (어르신 말 + 모리 답) |
-| 🡅 | `POST /devices/{id}/safety-events` | 위험 신호 — 자해는 서버가 받는 즉시 가족에게 알림 |
-| 🡇 | `GET /devices/{id}/medications` | 약 시간표 · 복용 확인 여부 |
-| 🡇 | `GET /devices/{id}/settings` | 볼륨 · 등록된 목소리 · 기본 목소리 |
-| 🡇 | `GET /devices/{id}/dnd` | 방해 금지 시간대 |
-| 🡇 | `GET /devices/{id}/chat/pending` → 🡅 `POST .../chat/delivered` | 가족 메시지 수신 후 전달 확인 |
-| 🡇 | `GET /devices/{id}/memories` | 어르신 프로필 · 가족 · 사진 추억 (RAG 원본) |
+| 올림 | `PATCH /devices/{id}/heartbeat` | 5분마다 |
+| 올림 | `PATCH /devices/{id}/conversation` | 대화 시작/종료 |
+| 올림 | `POST /devices/{id}/emotions` | 발화마다 감정 라벨 |
+| 올림 | `POST /devices/{id}/activities` | 약 알림 등 활동 기록 |
+| 올림 | `POST /devices/{id}/utterances` | 대화 한 턴 (어르신 말 + 모리 답) |
+| 올림 | `POST /devices/{id}/safety-events` | 위험 신호 — 자해는 서버가 받는 즉시 가족에게 알림 |
+| 받음 | `GET /devices/{id}/medications` | 약 시간표 · 복용 확인 여부 |
+| 받음 | `GET /devices/{id}/settings` | 볼륨 · 등록된 목소리 · 기본 목소리 |
+| 받음 | `GET /devices/{id}/dnd` | 방해 금지 시간대 |
+| 받음·올림 | `GET /devices/{id}/chat/pending` → `POST .../chat/delivered` | 가족 메시지를 받아 전한 뒤, 전달했다고 알림 |
+| 받음 | `GET /devices/{id}/memories` | 어르신 프로필 · 가족 · 사진 추억 (RAG 원본) |
 
 대화 내용은 **두 곳에 남습니다.** 서버로는 턴이 끝날 때마다 `POST /utterances` 로 올리고,
 동시에 `conversations/{환자ID}/{날짜}.jsonl` 에 append-only 로도 쌓습니다.
