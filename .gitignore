@@ -26,3 +26,7 @@ models/
 .env
 rag/chroma_db/
 *.log
+
+# 대화 저장 로그(환자 데이터 — 커밋 금지, 백엔드가 로컬에서 가져감)
+conversations/
+*.jsonl

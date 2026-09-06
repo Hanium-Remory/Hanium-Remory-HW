@@ -99,6 +99,7 @@ sys.path.insert(0, str(ROOT / "face"))
 
 from stt4vad_hat import STTHandler              # noqa: E402
 from retriever import build_context_prompt  # noqa: E402
+from conversation_log import ConversationLogger  # noqa: E402
 
 from groq import Groq                        # noqa: E402
 from mic_vad import LiveRecorder            # noqa: E402
@@ -737,6 +738,12 @@ def main() -> None:
 
     stt           = STTHandler(model_size=WHISPER_MODEL)
 
+    # 대화 내용 저장기(백엔드가 나중에 파일에서 가져감)
+    conv_logger   = ConversationLogger(
+        CONVERSATION_LOG_DIR, PATIENT_ID, device_id=DEVICE_ID
+    )
+    conv_session_id: str | None = None
+
     wakeword_detector = MoriyaWakeWordDetector(
         moriya_model_path=ROOT / "models" / "moriya_v1.onnx",
         models_dir=ROOT / "models",
@@ -864,6 +871,7 @@ def main() -> None:
             if wav_path is None:
                 print("💤 대화를 종료하고 웨이크워드 대기로 돌아갑니다.")
                 conversation_active = False
+                conv_session_id = None       # 세션 종료
                 report_conversation(False)   # 대화중 종료
                 # 한 마디도 못 나눈 헛걸음은 일과에 남기지 않는다.
                 if turns_this_session:
