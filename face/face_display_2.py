@@ -2,7 +2,8 @@
 face_display_2.py  (브라우저 얼굴 버전 — 기존 pygame FaceDisplay 대체)
 ---------------------------------------------------------------
 브라우저(mori_face.html)에 WebSocket으로 표정/말하기/사진 명령을 보낸다.
-main.py 는 set_expression / start_speaking / stop_speaking / show_photo / hide_photo / close 만 쓴다.
+main.py 는 set_expression / listen_start / listen_stop / start_speaking / stop_speaking /
+show_notice / hide_notice / show_photo / hide_photo / close 만 쓴다.
 
 필요: pip install websockets
 브라우저는 chromium --kiosk 로 mori_face.html 을 띄워두면 자동 연결된다.
@@ -16,6 +17,8 @@ class FaceDisplay2:
         self._host, self._port = host, port
         self._clients = set()
         self._cur_expr = "평온"
+        self._listening = False
+        self._notice = None          # (제목, 부제) — 안내가 떠 있는 동안만
         self._loop = asyncio.new_event_loop()
         self._ready = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -31,6 +34,13 @@ class FaceDisplay2:
                 # 새로 연결되면 현재 표정을 즉시 동기화
                 await ws.send(json.dumps({"cmd": "emotion", "name": self._cur_expr},
                                          ensure_ascii=False))
+                if self._listening:
+                    await ws.send(json.dumps({"cmd": "listen_start"}))
+                if self._notice:
+                    title, sub, icon = self._notice
+                    await ws.send(json.dumps(
+                        {"cmd": "notice", "title": title, "sub": sub, "icon": icon},
+                        ensure_ascii=False))
                 async for _msg in ws:
                     pass
             finally:
@@ -62,11 +72,40 @@ class FaceDisplay2:
         self._cur_expr = label
         self._send({"cmd": "emotion", "name": label})
 
+    def listen_start(self):
+        """어르신 말을 듣기 시작했다 — 화면에 불을 켠다.
+
+        꺼져 있다가 켜지는 순간 한 번 확 번쩍이고, 듣는 동안은 은은하게
+        숨쉰다. 웨이크워드를 알아들었는지 멀리서도 바로 보이게 하려는 것이다.
+        """
+        self._listening = True
+        self._send({"cmd": "listen_start"})
+
+    def listen_stop(self):
+        """다 들었다 — 불을 끈다(이제 생각하거나 말할 차례다)."""
+        self._listening = False
+        self._send({"cmd": "listen_stop"})
+
     def start_speaking(self):
         self._send({"cmd": "speak_start"})
 
     def stop_speaking(self):
         self._send({"cmd": "speak_stop"})
+
+    def show_notice(self, title: str, sub: str = "", icon: str = "pill"):
+        """약 알림·가족 메시지 같은 안내를 화면에 띄운다.
+
+        말하는 동안만 얼굴을 덮는다. 소리를 놓쳤거나 잘 안 들리는 어르신도
+        무슨 일인지 읽을 수 있게 하려는 것이다.
+        icon: pill(알약) | message(말풍선)
+        """
+        self._notice = (title, sub, icon)
+        self._send({"cmd": "notice", "title": title, "sub": sub, "icon": icon})
+
+    def hide_notice(self):
+        """안내를 내리고 모리 얼굴로 돌아온다."""
+        self._notice = None
+        self._send({"cmd": "notice_hide"})
 
     def show_photo(self, url: str):
         """가족이 보낸 사진을 화면 전체에 띄운다."""
@@ -77,6 +116,10 @@ class FaceDisplay2:
         self._send({"cmd": "photo_hide"})
 
     def close(self):
+        self._listening = False
+        self._notice = None
+        self._send({"cmd": "listen_stop"})
+        self._send({"cmd": "notice_hide"})
         self._send({"cmd": "emotion", "name": "평온"})
         try:
             self._loop.call_soon_threadsafe(self._loop.stop)

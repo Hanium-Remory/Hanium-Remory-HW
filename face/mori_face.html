@@ -10,6 +10,16 @@
   /* 가족 사진 오버레이 — 표시될 때만 얼굴 위를 덮는다 */
   #photo{position:fixed;inset:0;width:100vw;height:100vh;object-fit:contain;
          background:#000;display:none;z-index:10;}
+  /* 약 알림 같은 안내. 말하는 동안만 얼굴을 덮는다. 사진(z-index 10)보다
+     위에 둔다 — 사진을 보고 계시던 중이라도 약 시간은 알려드려야 한다.
+     어르신이 멀리서도 읽어야 해서 화면 높이에 비례해 크게 잡는다. */
+  #notice{position:fixed;inset:0;display:none;z-index:11;
+          flex-direction:column;align-items:center;justify-content:center;gap:2.5vh;
+          background:#0e1216;font-family:system-ui,'Apple SD Gothic Neo',sans-serif;
+          text-align:center;padding:0 6vw;}
+  #noticeIcon{width:22vh;height:22vh;}
+  #noticeTitle{font-size:13vh;line-height:1.15;font-weight:800;color:#FFD98A;}
+  #noticeSub{font-size:7vh;line-height:1.2;font-weight:600;color:#B9A88F;}
 </style>
 </head>
 <body>
@@ -17,6 +27,15 @@
     <g id="zzz" font-weight="600" text-anchor="middle" font-family="sans-serif">
       <text id="z0" opacity="0">Z</text><text id="z1" opacity="0">Z</text><text id="z2" opacity="0">Z</text>
     </g>
+    <!-- 듣는 중 표시. 웨이크워드를 알아들었는지 멀리서도 보이게 한다. -->
+    <g id="wake" opacity="0">
+      <!-- 테두리는 '켜져 있다' 는 기척만 준다. 알아채는 쪽은 전구다. -->
+      <rect id="wakeRing" x="5" y="5" width="410" height="260" rx="24"
+            fill="none" stroke-width="1.2" stroke-opacity="0.2"/>
+      <circle id="wakeBulb" cx="378" cy="36" r="7"/>
+      <rect id="wakeBase" x="373.5" y="44" width="9" height="4" rx="1.5"/>
+    </g>
+
     <g id="ink">
       <path id="eyeLpath"/><path id="eyeRpath"/>
       <path id="archL" fill="none" stroke-width="15" stroke-linecap="round" opacity="0"/>
@@ -25,6 +44,22 @@
       <ellipse id="mouthOpen" cx="210" cy="214" rx="24" ry="0" opacity="0"/>
     </g>
   </svg>
+
+  <!-- 약 알림 같은 안내 (평소엔 숨김) -->
+  <div id="notice">
+    <svg id="noticeIcon" viewBox="0 0 64 64" aria-hidden="true">
+      <g id="iconPill" transform="rotate(-40 32 32)">
+        <rect x="10" y="23" width="44" height="18" rx="9" fill="#FFC95C"/>
+        <path d="M32,23 L32,41" stroke="#0e1216" stroke-width="3.5"/>
+      </g>
+      <g id="iconMsg" display="none">
+        <rect x="7" y="13" width="50" height="33" rx="10" fill="#FFC95C"/>
+        <path d="M20,46 L20,58 L33,46 Z" fill="#FFC95C"/>
+      </g>
+    </svg>
+    <div id="noticeTitle"></div>
+    <div id="noticeSub"></div>
+  </div>
 
   <!-- 가족이 보낸 사진 (평소엔 숨김) -->
   <img id="photo" alt="">
@@ -49,6 +84,10 @@
   var pop=1,vpop=0;
   var speaking=false,speakAmt=0,speechEnv=0,sylTarget=0,nextSyl=0;
   var blink=0,blinkTgt=0,igX=0,igY=0,igXt=0,igYt=0,t0=performance.now();
+  // 듣는 중 표시. listenAmt 는 켜짐/꺼짐이 부드럽게 오가는 값이고,
+  // wakePop 은 알아들은 그 순간 한 번 번쩍이고 잦아드는 값이다.
+  var listening=false,listenAmt=0,wakePop=0;
+  var WAKE_COL="255,201,92";   // 전구색. 표정 색과 섞이지 않게 따로 둔다.
 
   function setEmotion(n){var p=E[n];if(!p)return;keys.forEach(function(k){tgt[k]=p[k];});tgt.col=p.col.slice();vpop+=p.kick;}
 
@@ -56,8 +95,38 @@
   function showPhoto(url){var el=document.getElementById("photo");if(!el||!url)return;el.src=url;el.style.display="block";}
   function hidePhoto(){var el=document.getElementById("photo");if(!el)return;el.style.display="none";el.removeAttribute("src");}
 
+  // ── 듣는 중 표시 ──
+  function listenStart(){if(!listening)wakePop=1;listening=true;}
+  function listenStop(){listening=false;}
+
+  // ── 안내 카드 ──
+  function showNotice(title,sub,icon){
+    var el=document.getElementById("notice");if(!el)return;
+    var t=document.getElementById("noticeTitle");
+    title=title||"";
+    // 아주 긴 메시지는 화면을 넘긴다. 읽을 만큼만 자른다(소리로는 다 들려준다).
+    if(title.length>120) title=title.slice(0,119)+"…";
+    t.textContent=title;
+    // 가족 메시지는 길이를 알 수 없다. 화면을 넘치지 않게 글자를 줄인다.
+    var n=title.length;
+    var ts=(n<=8?13:n<=16?9.5:n<=30?7:n<=60?5:4);
+    t.style.fontSize=ts+"vh";
+    var s=document.getElementById("noticeSub");
+    s.textContent=sub||"";
+    s.style.display=(sub?"block":"none");
+    // 보낸 사람이 본문보다 커 보이면 위계가 뒤집힌다. 늘 본문보다 작게 둔다.
+    s.style.fontSize=Math.min(7,ts*0.62).toFixed(2)+"vh";
+    var msg=(icon==="message");
+    document.getElementById("iconPill").setAttribute("display",msg?"none":"inline");
+    document.getElementById("iconMsg").setAttribute("display",msg?"inline":"none");
+    el.style.display="flex";
+  }
+  function hideNotice(){var el=document.getElementById("notice");if(el)el.style.display="none";}
+
   window.Mori={setEmotion:setEmotion, speakStart:function(){speaking=true;}, speakStop:function(){speaking=false;},
-               showPhoto:showPhoto, hidePhoto:hidePhoto};
+               showPhoto:showPhoto, hidePhoto:hidePhoto,
+               listenStart:listenStart, listenStop:listenStop,
+               showNotice:showNotice, hideNotice:hideNotice};
 
   // WebSocket 제어 채널 (파이썬 FaceDisplay 가 명령을 보냄)
   function connect(){
@@ -67,7 +136,11 @@
       else if(m.cmd==="speak_start")speaking=true;
       else if(m.cmd==="speak_stop")speaking=false;
       else if(m.cmd==="photo")showPhoto(m.url);
-      else if(m.cmd==="photo_hide")hidePhoto();};
+      else if(m.cmd==="photo_hide")hidePhoto();
+      else if(m.cmd==="listen_start")listenStart();
+      else if(m.cmd==="listen_stop")listenStop();
+      else if(m.cmd==="notice")showNotice(m.title,m.sub,m.icon);
+      else if(m.cmd==="notice_hide")hideNotice();};
     ws.onclose=function(){setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
   }
@@ -85,6 +158,7 @@
   var ZA=[{x:292,y:78,s:17},{x:312,y:58,s:23},{x:334,y:36,s:31}];
   var lastBlink=performance.now()+2000,lastSac=performance.now()+1200,prev=performance.now();
 
+
   function frame(now){
     var dt=Math.min(0.033,(now-prev)/1000);prev=now;
     keys.forEach(function(k){spring(k,dt);});
@@ -97,6 +171,21 @@
     if(speaking){if(now>nextSyl){var c=Math.random()<0.16;sylTarget=c?0.02:(0.3+Math.random()*0.62);nextSyl=now+150+Math.random()*120;}
       var rt=(sylTarget>speechEnv)?0.34:0.18;speechEnv+=(sylTarget-speechEnv)*rt;}
     else{speechEnv+=(0-speechEnv)*0.16;}
+
+    // 듣는 중 표시. 켜질 때 확 번쩍였다가(wakePop) 은은한 맥박으로 가라앉는다.
+    listenAmt+=((listening?1:0)-listenAmt)*0.18;
+    wakePop*=0.93;
+    if(wakePop<0.004)wakePop=0;
+    var wakeG=document.getElementById("wake");
+    if(listenAmt>0.004||wakePop>0){
+      var pulse=0.62+0.38*Math.sin((now-t0)/1000*3.4);
+      var wakeA=Math.min(1,listenAmt*pulse+wakePop);
+      wakeG.setAttribute("opacity",wakeA.toFixed(3));
+      set("wakeRing","stroke-width",(1.2+0.6*wakeA).toFixed(2));
+      set("wakeRing","stroke-opacity",(0.18+0.14*wakeA).toFixed(3));
+    }else if(wakeG.getAttribute("opacity")!=="0"){
+      wakeG.setAttribute("opacity","0");
+    }
 
     var sleepy=Math.max(0,cur.sleep);
     if(now>lastBlink){if(sleepy<0.5){blinkTgt=1;setTimeout(function(){blinkTgt=0;},110);}lastBlink=now+3500+Math.random()*3000;}
@@ -123,6 +212,9 @@
     var r=Math.round(cur.col[0]),g2=Math.round(cur.col[1]),bl=Math.round(cur.col[2]),col="rgb("+r+","+g2+","+bl+")";
     ["eyeLpath","eyeRpath","mouthOpen"].forEach(function(id){set(id,"fill",col);});
     ["archL","archR","mouthLine"].forEach(function(id){set(id,"stroke",col);});
+    var wc="rgb("+WAKE_COL+")";
+    ["wakeBulb","wakeBase"].forEach(function(id){set(id,"fill",wc);});
+    set("wakeRing","stroke",wc);
     document.getElementById("ink").style.filter="drop-shadow(0 0 13px rgba("+r+","+g2+","+bl+",.4))";
 
     for(var zi=0;zi<3;zi++){var a=ZA[zi],ph=((now/1700)+zi*0.33)%1,zt=document.getElementById("z"+zi);
