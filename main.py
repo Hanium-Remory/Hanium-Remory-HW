@@ -400,20 +400,53 @@ def medication_worker(face=None) -> None:
 
 # 사진을 내릴 타이머. 사진이 잇따라 오면 앞 메시지의 타이머가 뒤 사진을
 # 일찍 내려버리므로, 새 사진을 띄울 때 앞 타이머를 취소한다.
+#
+# 취소만으로는 부족하다 — 앞 타이머가 이미 울리기 시작한 참이면 cancel 이
+# 먹지 않아, 갓 올라온 사진을 그 타이머가 내려버린다. 그래서 사진마다 번호를
+# 붙이고, 타이머는 자기 번호가 아직 최신일 때만 내린다.
 _photo_timer: threading.Timer | None = None
+_photo_seq = 0
 _photo_timer_lock = threading.Lock()
+
+
+def _expire_photo(face, seq: int) -> None:
+    """타이머가 울렸다. 그 사이 새 사진이 올라왔으면 내리지 않는다."""
+    global _photo_timer
+    with _photo_timer_lock:
+        if seq != _photo_seq:
+            return
+        _photo_timer = None
+    face.hide_photo()
 
 
 def _show_photo_for_a_while(face, url: str) -> None:
     """가족 사진을 띄우고 PHOTO_DISPLAY_SEC 뒤에 내려 모리 얼굴로 돌아온다."""
-    global _photo_timer
+    global _photo_timer, _photo_seq
     with _photo_timer_lock:
         if _photo_timer is not None:
             _photo_timer.cancel()
+        _photo_seq += 1
+        seq = _photo_seq
         face.show_photo(url)
-        _photo_timer = threading.Timer(PHOTO_DISPLAY_SEC, face.hide_photo)
+        _photo_timer = threading.Timer(PHOTO_DISPLAY_SEC, _expire_photo, args=(face, seq))
         _photo_timer.daemon = True
         _photo_timer.start()
+
+
+def _hide_photo_now(face) -> None:
+    """사진을 지금 내린다. 걸려 있던 타이머도 함께 끈다.
+
+    어르신이 말을 거시면 대화가 먼저다. 사진이 얼굴을 덮고 있으면 웨이크워드를
+    알아들었다는 전구도 가려져, 알아들었는지 알 수 없다.
+    """
+    global _photo_timer, _photo_seq
+    with _photo_timer_lock:
+        if _photo_timer is not None:
+            _photo_timer.cancel()
+            _photo_timer = None
+        # 번호를 올려 두면 이미 울리기 시작한 타이머도 제 할 일을 접는다.
+        _photo_seq += 1
+        face.hide_photo()
 
 
 def _deliver_chat(m: dict, face=None) -> None:
@@ -706,6 +739,8 @@ def main() -> None:
                     continue
                 print("🎤 말씀하세요.")
                 if face:
+                    # 사진을 보고 계셨더라도 말을 거시면 대화가 먼저다.
+                    _hide_photo_now(face)
                     # 알아들었다는 걸 바로 보여준다. 소리만으로는 어르신도
                     # 옆에서 보는 가족도 웨이크워드가 먹었는지 알 수 없다.
                     face.set_expression("경청")
