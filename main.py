@@ -59,7 +59,7 @@ SETTINGS_SYNC_INTERVAL_SEC = 60
 # 가족 채팅을 몇 초마다 확인할지
 CHAT_CHECK_INTERVAL_SEC = 15
 # 가족 사진을 화면에 몇 초 동안 보여줄지
-PHOTO_DISPLAY_SEC = 60
+PHOTO_DISPLAY_SEC = 30
 # 어르신 추억(RAG)을 백엔드에서 몇 초마다 동기화할지
 RAG_SYNC_INTERVAL_SEC = 300
 # 스피커 볼륨 조절용 ALSA 컨트롤 이름 (amixer scontrols 로 확인)
