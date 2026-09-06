@@ -320,20 +320,37 @@ def report_conversation(active: bool) -> None:
     _conversation_queue.put(active)
 
 
-def _speak_when_free(text: str, face=None) -> None:
-    """어르신이 말하는 중이면 그 턴이 끝나길 기다렸다가 음성으로 안내한다."""
+def _speak_when_free(
+    text: str, face=None, notice_title: str | None = None, notice_sub: str = ""
+) -> None:
+    """어르신이 말하는 중이면 그 턴이 끝나길 기다렸다가 음성으로 안내한다.
+
+    [notice_title] 을 주면 말하는 동안 화면에 안내를 띄우고, 말이 끝나면
+    내려서 모리 얼굴로 돌아온다. 소리를 놓쳤거나 잘 안 들리셔도 무슨
+    일인지 읽을 수 있게 하려는 것이다.
+    """
     while recording.is_set():
         time.sleep(0.3)
     with speaker_lock:
         if face:
             face.set_expression("평온")
-        speak(text)
+            if notice_title:
+                face.show_notice(notice_title, notice_sub)
+        try:
+            speak(text)
+        finally:
+            # 말이 끊기든 끝나든 안내가 화면에 남지 않게 한다.
+            if face and notice_title:
+                face.hide_notice()
 
 
 def _confirm_medication(med_name: str, face=None) -> None:
     """약 알림 MED_CONFIRM_DELAY_SEC 후, 복용했는지 한 번 더 챙겨 묻는다(대답은 안 받음)."""
     _speak_when_free(
-        f"{med_name} 드셨어요? 아직 안 드셨으면 지금 꼭 챙겨 드세요.", face
+        f"{med_name} 드셨어요? 아직 안 드셨으면 지금 꼭 챙겨 드세요.",
+        face,
+        notice_title="약 드셨어요?",
+        notice_sub=med_name,
     )
 
 
@@ -363,7 +380,9 @@ def medication_worker(face=None) -> None:
                         text = f"{timing}에 {m['name']} 드실 시간이에요. 잊지 말고 꼭 챙겨 드세요."
                     else:
                         text = f"{m['name']} 드실 시간이에요. 잊지 말고 꼭 챙겨 드세요."
-                    _speak_when_free(text, face)
+                    _speak_when_free(
+                        text, face, notice_title="약 드실 시간이에요!", notice_sub=m["name"]
+                    )
                     # 앱이 아이콘·문구를 코드로 고르므로 한글이 아니라 코드로 남긴다.
                     report_activity("MEDICATION", m["name"])
 

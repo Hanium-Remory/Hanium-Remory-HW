@@ -10,6 +10,15 @@
   /* 가족 사진 오버레이 — 표시될 때만 얼굴 위를 덮는다 */
   #photo{position:fixed;inset:0;width:100vw;height:100vh;object-fit:contain;
          background:#000;display:none;z-index:10;}
+  /* 약 알림 같은 안내. 말하는 동안만 얼굴을 덮는다(사진보다는 아래).
+     어르신이 멀리서도 읽어야 해서 화면 높이에 비례해 크게 잡는다. */
+  #notice{position:fixed;inset:0;display:none;z-index:9;
+          flex-direction:column;align-items:center;justify-content:center;gap:2.5vh;
+          background:#0e1216;font-family:system-ui,'Apple SD Gothic Neo',sans-serif;
+          text-align:center;padding:0 6vw;}
+  #noticeIcon{width:22vh;height:22vh;}
+  #noticeTitle{font-size:13vh;line-height:1.15;font-weight:800;color:#FFD98A;}
+  #noticeSub{font-size:7vh;line-height:1.2;font-weight:600;color:#B9A88F;}
 </style>
 </head>
 <body>
@@ -34,6 +43,18 @@
       <ellipse id="mouthOpen" cx="210" cy="214" rx="24" ry="0" opacity="0"/>
     </g>
   </svg>
+
+  <!-- 약 알림 같은 안내 (평소엔 숨김) -->
+  <div id="notice">
+    <svg id="noticeIcon" viewBox="0 0 64 64" aria-hidden="true">
+      <g transform="rotate(-40 32 32)">
+        <rect x="10" y="23" width="44" height="18" rx="9" fill="#FFC95C"/>
+        <path d="M32,23 L32,41" stroke="#0e1216" stroke-width="3.5"/>
+      </g>
+    </svg>
+    <div id="noticeTitle"></div>
+    <div id="noticeSub"></div>
+  </div>
 
   <!-- 가족이 보낸 사진 (평소엔 숨김) -->
   <img id="photo" alt="">
@@ -73,9 +94,21 @@
   function listenStart(){if(!listening)wakePop=1;listening=true;}
   function listenStop(){listening=false;}
 
+  // ── 안내 카드 ──
+  function showNotice(title,sub){
+    var el=document.getElementById("notice");if(!el)return;
+    document.getElementById("noticeTitle").textContent=title||"";
+    var s=document.getElementById("noticeSub");
+    s.textContent=sub||"";
+    s.style.display=(sub?"block":"none");
+    el.style.display="flex";
+  }
+  function hideNotice(){var el=document.getElementById("notice");if(el)el.style.display="none";}
+
   window.Mori={setEmotion:setEmotion, speakStart:function(){speaking=true;}, speakStop:function(){speaking=false;},
                showPhoto:showPhoto, hidePhoto:hidePhoto,
-               listenStart:listenStart, listenStop:listenStop};
+               listenStart:listenStart, listenStop:listenStop,
+               showNotice:showNotice, hideNotice:hideNotice};
 
   // WebSocket 제어 채널 (파이썬 FaceDisplay 가 명령을 보냄)
   function connect(){
@@ -87,7 +120,9 @@
       else if(m.cmd==="photo")showPhoto(m.url);
       else if(m.cmd==="photo_hide")hidePhoto();
       else if(m.cmd==="listen_start")listenStart();
-      else if(m.cmd==="listen_stop")listenStop();};
+      else if(m.cmd==="listen_stop")listenStop();
+      else if(m.cmd==="notice")showNotice(m.title,m.sub);
+      else if(m.cmd==="notice_hide")hideNotice();};
     ws.onclose=function(){setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
   }
