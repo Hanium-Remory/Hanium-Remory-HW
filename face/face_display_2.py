@@ -37,8 +37,9 @@ class FaceDisplay2:
                 if self._listening:
                     await ws.send(json.dumps({"cmd": "listen_start"}))
                 if self._notice:
+                    title, sub, icon = self._notice
                     await ws.send(json.dumps(
-                        {"cmd": "notice", "title": self._notice[0], "sub": self._notice[1]},
+                        {"cmd": "notice", "title": title, "sub": sub, "icon": icon},
                         ensure_ascii=False))
                 async for _msg in ws:
                     pass
@@ -91,14 +92,15 @@ class FaceDisplay2:
     def stop_speaking(self):
         self._send({"cmd": "speak_stop"})
 
-    def show_notice(self, title: str, sub: str = ""):
-        """약 알림 같은 안내를 화면에 띄운다.
+    def show_notice(self, title: str, sub: str = "", icon: str = "pill"):
+        """약 알림·가족 메시지 같은 안내를 화면에 띄운다.
 
         말하는 동안만 얼굴을 덮는다. 소리를 놓쳤거나 잘 안 들리는 어르신도
         무슨 일인지 읽을 수 있게 하려는 것이다.
+        icon: pill(알약) | message(말풍선)
         """
-        self._notice = (title, sub)
-        self._send({"cmd": "notice", "title": title, "sub": sub})
+        self._notice = (title, sub, icon)
+        self._send({"cmd": "notice", "title": title, "sub": sub, "icon": icon})
 
     def hide_notice(self):
         """안내를 내리고 모리 얼굴로 돌아온다."""

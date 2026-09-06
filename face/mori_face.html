@@ -47,9 +47,13 @@
   <!-- 약 알림 같은 안내 (평소엔 숨김) -->
   <div id="notice">
     <svg id="noticeIcon" viewBox="0 0 64 64" aria-hidden="true">
-      <g transform="rotate(-40 32 32)">
+      <g id="iconPill" transform="rotate(-40 32 32)">
         <rect x="10" y="23" width="44" height="18" rx="9" fill="#FFC95C"/>
         <path d="M32,23 L32,41" stroke="#0e1216" stroke-width="3.5"/>
+      </g>
+      <g id="iconMsg" display="none">
+        <rect x="7" y="13" width="50" height="33" rx="10" fill="#FFC95C"/>
+        <path d="M20,46 L20,58 L33,46 Z" fill="#FFC95C"/>
       </g>
     </svg>
     <div id="noticeTitle"></div>
@@ -95,12 +99,25 @@
   function listenStop(){listening=false;}
 
   // ── 안내 카드 ──
-  function showNotice(title,sub){
+  function showNotice(title,sub,icon){
     var el=document.getElementById("notice");if(!el)return;
-    document.getElementById("noticeTitle").textContent=title||"";
+    var t=document.getElementById("noticeTitle");
+    title=title||"";
+    // 아주 긴 메시지는 화면을 넘긴다. 읽을 만큼만 자른다(소리로는 다 들려준다).
+    if(title.length>120) title=title.slice(0,119)+"…";
+    t.textContent=title;
+    // 가족 메시지는 길이를 알 수 없다. 화면을 넘치지 않게 글자를 줄인다.
+    var n=title.length;
+    var ts=(n<=8?13:n<=16?9.5:n<=30?7:n<=60?5:4);
+    t.style.fontSize=ts+"vh";
     var s=document.getElementById("noticeSub");
     s.textContent=sub||"";
     s.style.display=(sub?"block":"none");
+    // 보낸 사람이 본문보다 커 보이면 위계가 뒤집힌다. 늘 본문보다 작게 둔다.
+    s.style.fontSize=Math.min(7,ts*0.62).toFixed(2)+"vh";
+    var msg=(icon==="message");
+    document.getElementById("iconPill").setAttribute("display",msg?"none":"inline");
+    document.getElementById("iconMsg").setAttribute("display",msg?"inline":"none");
     el.style.display="flex";
   }
   function hideNotice(){var el=document.getElementById("notice");if(el)el.style.display="none";}
@@ -121,7 +138,7 @@
       else if(m.cmd==="photo_hide")hidePhoto();
       else if(m.cmd==="listen_start")listenStart();
       else if(m.cmd==="listen_stop")listenStop();
-      else if(m.cmd==="notice")showNotice(m.title,m.sub);
+      else if(m.cmd==="notice")showNotice(m.title,m.sub,m.icon);
       else if(m.cmd==="notice_hide")hideNotice();};
     ws.onclose=function(){setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};

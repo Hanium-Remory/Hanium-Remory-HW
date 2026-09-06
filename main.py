@@ -398,6 +398,24 @@ def medication_worker(face=None) -> None:
         time.sleep(MEDICATION_CHECK_INTERVAL_SEC)
 
 
+# 사진을 내릴 타이머. 사진이 잇따라 오면 앞 메시지의 타이머가 뒤 사진을
+# 일찍 내려버리므로, 새 사진을 띄울 때 앞 타이머를 취소한다.
+_photo_timer: threading.Timer | None = None
+_photo_timer_lock = threading.Lock()
+
+
+def _show_photo_for_a_while(face, url: str) -> None:
+    """가족 사진을 띄우고 PHOTO_DISPLAY_SEC 뒤에 내려 모리 얼굴로 돌아온다."""
+    global _photo_timer
+    with _photo_timer_lock:
+        if _photo_timer is not None:
+            _photo_timer.cancel()
+        face.show_photo(url)
+        _photo_timer = threading.Timer(PHOTO_DISPLAY_SEC, face.hide_photo)
+        _photo_timer.daemon = True
+        _photo_timer.start()
+
+
 def _deliver_chat(m: dict, face=None) -> None:
     """가족 메시지 하나를 인형이 전한다. 글=TTS, 사진=화면(PHOTO_DISPLAY_SEC 초)."""
     content = (m.get("content") or "").strip()
@@ -419,18 +437,26 @@ def _deliver_chat(m: dict, face=None) -> None:
     with speaker_lock:
         if face:
             face.set_expression("기쁨")
-        if content:
-            speak(f"{sender}에게서 메시지가 왔어요. {content}")
-        if image_url:
-            speak(f"{sender}이 사진을 보냈어요. 화면을 봐 주세요.")
-        if face:
-            face.set_expression("평온")
+            # 소리를 놓쳐도 누가 무슨 말을 했는지 읽을 수 있게 화면에도 띄운다.
+            if content:
+                face.show_notice(content, f"{sender}에게서", icon="message")
+            elif image_url:
+                face.show_notice("사진이 왔어요", f"{sender}에게서", icon="message")
+        try:
+            if content:
+                speak(f"{sender}에게서 메시지가 왔어요. {content}")
+            if image_url:
+                speak(f"{sender}이 사진을 보냈어요. 화면을 봐 주세요.")
+        finally:
+            # 말이 끊기든 끝나든 안내가 화면에 남지 않게 한다.
+            if face:
+                face.hide_notice()
+                face.set_expression("평온")
 
     # 사진은 화면에 잠깐 띄우고, 일정 시간 뒤 자동으로 내린다(음성과 별개로 계속 표시).
     if image_url and face:
         try:
-            face.show_photo(image_url)
-            threading.Timer(PHOTO_DISPLAY_SEC, face.hide_photo).start()
+            _show_photo_for_a_while(face, image_url)
         except Exception as e:
             print(f"⚠️  사진 표시 실패: {e}")
 
