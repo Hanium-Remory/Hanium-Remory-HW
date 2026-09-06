@@ -10,9 +10,10 @@
   /* 가족 사진 오버레이 — 표시될 때만 얼굴 위를 덮는다 */
   #photo{position:fixed;inset:0;width:100vw;height:100vh;object-fit:contain;
          background:#000;display:none;z-index:10;}
-  /* 약 알림 같은 안내. 말하는 동안만 얼굴을 덮는다(사진보다는 아래).
+  /* 약 알림 같은 안내. 말하는 동안만 얼굴을 덮는다. 사진(z-index 10)보다
+     위에 둔다 — 사진을 보고 계시던 중이라도 약 시간은 알려드려야 한다.
      어르신이 멀리서도 읽어야 해서 화면 높이에 비례해 크게 잡는다. */
-  #notice{position:fixed;inset:0;display:none;z-index:9;
+  #notice{position:fixed;inset:0;display:none;z-index:11;
           flex-direction:column;align-items:center;justify-content:center;gap:2.5vh;
           background:#0e1216;font-family:system-ui,'Apple SD Gothic Neo',sans-serif;
           text-align:center;padding:0 6vw;}

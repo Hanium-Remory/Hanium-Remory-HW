@@ -342,6 +342,7 @@ def _speak_when_free(
             # 말이 끊기든 끝나든 안내가 화면에 남지 않게 한다.
             if face and notice_title:
                 face.hide_notice()
+                _restore_photo_if_any(face)
 
 
 def _confirm_medication(med_name: str, face=None) -> None:
@@ -406,27 +407,31 @@ def medication_worker(face=None) -> None:
 # 붙이고, 타이머는 자기 번호가 아직 최신일 때만 내린다.
 _photo_timer: threading.Timer | None = None
 _photo_seq = 0
+# 지금 화면에 떠 있는 사진. 안내가 잠깐 가렸다가 내려갈 때 다시 보여주려고 든다.
+_photo_url: str | None = None
 _photo_timer_lock = threading.Lock()
 
 
 def _expire_photo(face, seq: int) -> None:
     """타이머가 울렸다. 그 사이 새 사진이 올라왔으면 내리지 않는다."""
-    global _photo_timer
+    global _photo_timer, _photo_url
     with _photo_timer_lock:
         if seq != _photo_seq:
             return
         _photo_timer = None
+        _photo_url = None
     face.hide_photo()
 
 
 def _show_photo_for_a_while(face, url: str) -> None:
     """가족 사진을 띄우고 PHOTO_DISPLAY_SEC 뒤에 내려 모리 얼굴로 돌아온다."""
-    global _photo_timer, _photo_seq
+    global _photo_timer, _photo_seq, _photo_url
     with _photo_timer_lock:
         if _photo_timer is not None:
             _photo_timer.cancel()
         _photo_seq += 1
         seq = _photo_seq
+        _photo_url = url
         face.show_photo(url)
         _photo_timer = threading.Timer(PHOTO_DISPLAY_SEC, _expire_photo, args=(face, seq))
         _photo_timer.daemon = True
@@ -439,14 +444,27 @@ def _hide_photo_now(face) -> None:
     어르신이 말을 거시면 대화가 먼저다. 사진이 얼굴을 덮고 있으면 웨이크워드를
     알아들었다는 전구도 가려져, 알아들었는지 알 수 없다.
     """
-    global _photo_timer, _photo_seq
+    global _photo_timer, _photo_seq, _photo_url
     with _photo_timer_lock:
         if _photo_timer is not None:
             _photo_timer.cancel()
             _photo_timer = None
         # 번호를 올려 두면 이미 울리기 시작한 타이머도 제 할 일을 접는다.
         _photo_seq += 1
+        _photo_url = None
         face.hide_photo()
+
+
+def _restore_photo_if_any(face) -> None:
+    """안내가 내려간 뒤, 보고 계시던 사진이 있으면 처음부터 다시 보여준다.
+
+    안내가 사진 위를 덮고 있는 동안은 사진을 못 보신 셈이라, 남은 시간을
+    이어 주는 대신 PHOTO_DISPLAY_SEC 을 통째로 다시 준다.
+    """
+    with _photo_timer_lock:
+        url = _photo_url
+    if url:
+        _show_photo_for_a_while(face, url)
 
 
 def _deliver_chat(m: dict, face=None) -> None:
@@ -487,9 +505,13 @@ def _deliver_chat(m: dict, face=None) -> None:
                 face.set_expression("평온")
 
     # 사진은 화면에 잠깐 띄우고, 일정 시간 뒤 자동으로 내린다(음성과 별개로 계속 표시).
-    if image_url and face:
+    if face:
         try:
-            _show_photo_for_a_while(face, image_url)
+            if image_url:
+                _show_photo_for_a_while(face, image_url)
+            else:
+                # 글만 온 메시지였다면, 안내에 가려졌던 사진을 다시 보여준다.
+                _restore_photo_if_any(face)
         except Exception as e:
             print(f"⚠️  사진 표시 실패: {e}")
 
