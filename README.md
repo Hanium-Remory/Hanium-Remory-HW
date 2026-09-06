@@ -103,7 +103,7 @@ Flutter 앱으로 어르신 상태를 보고,
 |---|---|---|
 | 💓 `connection_worker` | 300s | "인형이 연결되어 있음"을 서버에 알림 (600s 넘게 끊기면 앱에 '연결 끊김') |
 | 💊 `medication_worker` | 30s | 약 시간이 되면 음성 안내 → 활동 기록 → 15분 뒤 복용 확인 |
-| 💬 `chat_worker` | 15s | 가족이 보낸 글은 TTS 로, 사진은 화면에 60초 표시 |
+| 💬 `chat_worker` | 15s | 가족이 보낸 글은 TTS + 알림 카드로, 사진은 화면에 30초 표시 |
 | ⚙️ `settings_worker` | 60s | 볼륨 · 방해 금지 시간 · 기본 목소리(화자 id) 동기화 |
 | 🧠 `rag_sync_worker` | 300s | 앱에 올라온 사진·추억을 받아 Chroma 증분 갱신 |
 | 🗨 `conversation_worker` | 이벤트 | 대화 시작/종료 보고를 순서대로 전송 (앱의 '대화중' 표시) |
@@ -117,7 +117,28 @@ Flutter 앱으로 어르신 상태를 보고,
 - 🙉 **환청을 걸러냅니다.** 0.4초 미만 클립은 아예 STT 를 건너뛰고, 결과에 한글이 한 글자도 없으면 버립니다. (`"you"`, `"Thanks for watching"` 같은 Whisper 특유의 무음 환청)
 - 🔇 **스피커는 하나뿐입니다.** 대화 TTS · 약 알림 · 가족 메시지가 서로 말을 끊지 않도록 `speaker_lock` 으로 줄을 세우고, 어르신이 말하는 중(`recording`)이면 알림을 그 턴이 끝날 때까지 미룹니다.
 - ⏱ **네트워크가 대화를 막지 않습니다.** '대화중' 보고는 큐에 넣고 즉시 돌아오고, TTS 는 청크를 미리 받아 쌓아두고 재생합니다.
+- 🚨 **가장 중요한 경로가 가장 조용하게 실패하지 않게.** 위험 신호 판별을 LLM 에만 맡기면, 모델이 `risk` 를 안 채우는 순간 자해 알림이 소리 없이 안 갑니다. 그래서 규칙(`safety.classify`)을 LLM 앞에 두었습니다. Groq 이 죽어도 규칙은 돕니다.
 - 🩹 **부품이 없어도 죽지 않습니다.** 카메라가 없으면 감정 없이, LCD 가 없으면 표정 없이, RAG 데이터가 없으면 기억 없이 — 대화 자체는 계속됩니다.
+
+---
+
+## 🛡 안전 판별
+
+어르신의 말에서 위험 신호를 가려냅니다. **규칙과 LLM 두 겹**으로 봅니다 — 규칙([`safety.py`](safety.py))이 먼저 보고, 규칙이 모르는 낯선 어법은 대화를 만드는 그 LLM 호출에 필드 하나를 얹어 함께 받습니다. 왕복이 늘지 않습니다.
+
+가려낸 뒤 **하는 일은 종류마다 다릅니다.**
+
+| 종류 | 어떻게 대응하나 | 왜 |
+|---|---|---|
+| 🆘 **자해** | LLM 을 **거치지 않고** 정해진 말로 답하고, 가족에게 **즉시 알림** | 모델이 무슨 말을 할지 모르는 채로 두면 안 되는 자리 |
+| 😠 **타해** | 야단치지도, 맞장구치지도 않고 정해진 말로 가라앉힘 | 치매의 공격성은 흔한 증상이고 대개 통증·불편에서 옴 |
+| 💊 **의료** | 판단하지 않고 가족·의사에게 넘김 | 약·치료 판단은 인형이 할 일이 아님 |
+| 🤐 **학대** | 기록만 남김 | 사실 확인이 안 된 정황. 실시간 알림이 오히려 어르신을 위험하게 만들 수 있음 |
+| 💢 **거친 말** | 훈계하지 않고 LLM 에 지침만 얹음 | 탈억제는 증상이지 악의가 아님 |
+
+한 문장에 여러 개가 섞이면 **자해를 가장 먼저** 봅니다. 되돌릴 수 없는 쪽이라 놓쳤을 때 대가가 가장 큽니다.
+
+> 오탐을 특히 신경 써서 걸러냅니다. "힘들어 **죽겠다**"(강조)와 "**죽고 싶다**"(욕구)를 어미로 가르고, "맛이 **죽여주네**"(칭찬)는 타해로 잡지 않습니다. "그 말이 **맞았어**"가 학대로 잡히지 않도록 `맞았` 은 아예 뺐습니다. — [`test_safety.py`](test_safety.py)
 
 ---
 
@@ -134,7 +155,7 @@ Flutter 앱으로 어르신 상태를 보고,
 | **비전 분석** | Gemini 2.5 Flash (선택) | 사진 → 기억 텍스트. 꺼두면 보호자 설명을 그대로 사용 |
 | **LLM** | Groq (`openai/gpt-oss-120b`) | JSON 모드로 `reply` + `expression` 동시 생성 |
 | **TTS** | CosyVoice2 스트리밍 (RTX 2080ti 서버) | Tailscale 사설망 경유 · 가족 목소리 화자 지정 |
-| **얼굴 표시** | WebSocket(8765) → Chromium kiosk + SVG | 표정 6종 + 말할 때 입 움직임 + 가족 사진 오버레이 |
+| **얼굴 표시** | WebSocket(8765) → Chromium kiosk + SVG | 표정 6종 · 말할 때 입 움직임 · 웨이크워드 전구 · 알림 카드(약·메시지) · 사진 오버레이 |
 | **오디오 출력** | ALSA `aplay` (`plughw:CARD=UACDemoV10`) | 볼륨은 `amixer` 로 서버 설정값 반영 |
 
 ---
@@ -147,6 +168,8 @@ wakeword.py          "모리야" 감지 (openWakeWord 임베딩 → ONNX)
 mic_vad.py           라이브 VAD 녹음 (발화 시작/끝 콜백 제공)
 audio_out.py         스피커 재생 + CosyVoice2 스트리밍 TTS
 conversation_log.py  대화 한 턴을 로컬 JSONL 로 저장 (백엔드가 pull)
+safety.py            어르신 말에서 위험 신호를 가려냄 (규칙 + LLM 두 겹)
+test_safety.py       안전 판별 테스트 — 오탐 위주로 검증
 
 stt/
 └── stt4vad_hat.py   Hailo Whisper STT + 환청 필터
@@ -162,7 +185,7 @@ rag/
 └── image_processor.py 사진 → Gemini Vision → 기억 데이터
 
 face/
-├── face_display_2.py  WebSocket 서버 (표정/말하기/사진 명령)
+├── face_display_2.py  WebSocket 서버 (표정·전구·알림·사진 명령)
 └── mori_face.html     브라우저에 그려지는 모리 얼굴 (SVG)
 ```
 
@@ -235,6 +258,15 @@ python main.py
 chromium-browser --kiosk face/mori_face.html
 ```
 
+### 6. 테스트
+
+```bash
+python test_safety.py
+```
+
+안전 판별이 위험한 말을 잡는지, **멀쩡한 말을 위험으로 오해하지 않는지** 확인합니다.
+인형에 pytest 를 깔지 않으려고 그냥 실행하는 방식입니다.
+
 ---
 
 ## 🔌 백엔드와 주고받는 것
@@ -247,11 +279,15 @@ chromium-browser --kiosk face/mori_face.html
 | 🡅 | `PATCH /devices/{id}/conversation` | 대화 시작/종료 |
 | 🡅 | `POST /devices/{id}/emotions` | 발화마다 감정 라벨 |
 | 🡅 | `POST /devices/{id}/activities` | 약 알림 등 활동 기록 |
+| 🡅 | `POST /devices/{id}/utterances` | 대화 한 턴 (어르신 말 + 모리 답) |
+| 🡅 | `POST /devices/{id}/safety-events` | 위험 신호 — 자해는 서버가 받는 즉시 가족에게 알림 |
 | 🡇 | `GET /devices/{id}/medications` | 약 시간표 · 복용 확인 여부 |
 | 🡇 | `GET /devices/{id}/settings` | 볼륨 · 등록된 목소리 · 기본 목소리 |
 | 🡇 | `GET /devices/{id}/dnd` | 방해 금지 시간대 |
 | 🡇 | `GET /devices/{id}/chat/pending` → 🡅 `POST .../chat/delivered` | 가족 메시지 수신 후 전달 확인 |
 | 🡇 | `GET /devices/{id}/memories` | 어르신 프로필 · 가족 · 사진 추억 (RAG 원본) |
 
-대화 내용은 API 로 올리지 않고 `conversations/{환자ID}/{날짜}.jsonl` 에 append-only 로 쌓습니다.
-백엔드가 이 파일을 읽어 갑니다. (환자 데이터이므로 `.gitignore` 로 커밋을 막아두었습니다.)
+대화 내용은 **두 곳에 남습니다.** 서버로는 턴이 끝날 때마다 `POST /utterances` 로 올리고,
+동시에 `conversations/{환자ID}/{날짜}.jsonl` 에 append-only 로도 쌓습니다.
+네트워크가 끊겨도 대화가 사라지지 않고, 백엔드가 나중에 파일에서 가져갈 수 있습니다.
+(환자 데이터이므로 `.gitignore` 로 커밋을 막아두었습니다.)
