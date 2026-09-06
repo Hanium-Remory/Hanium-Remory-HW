@@ -97,6 +97,7 @@ sys.path.insert(0, str(ROOT / "face"))
 
 from stt4vad_hat import STTHandler              # noqa: E402
 from retriever import build_context_prompt  # noqa: E402
+from conversation_log import ConversationLogger  # noqa: E402
 
 from groq import Groq                        # noqa: E402
 from mic_vad import LiveRecorder            # noqa: E402
@@ -251,6 +252,9 @@ def report_emotion(emotion: dict) -> None:
     except Exception as e:
         print(f"⚠️  감정 기록 실패: {e}")
 
+
+# 대화 내용을 로컬에 저장할 폴더(백엔드가 나중에 여기서 가져감). .env로 변경 가능.
+CONVERSATION_LOG_DIR = os.getenv("CONVERSATION_LOG_DIR", str(ROOT / "conversations"))
 
 # 대화중 보고 대기열. 웨이크워드 직후에 보내는 신호라 녹음 시작을 막으면 안 되고,
 # 시작/종료가 뒤집혀 도착하면 앱이 계속 '대화중'으로 남는다. 그래서 한 줄로 세워 보낸다.
@@ -549,6 +553,12 @@ def main() -> None:
 
     stt           = STTHandler(model_size=WHISPER_MODEL)
 
+    # 대화 내용 저장기(백엔드가 나중에 파일에서 가져감)
+    conv_logger   = ConversationLogger(
+        CONVERSATION_LOG_DIR, PATIENT_ID, device_id=DEVICE_ID
+    )
+    conv_session_id: str | None = None
+
     wakeword_detector = MoriyaWakeWordDetector(
         moriya_model_path=ROOT / "models" / "moriya_v1.onnx",
         models_dir=ROOT / "models",
@@ -628,6 +638,7 @@ def main() -> None:
                     continue
                 print("🎤 말씀하세요.")
                 conversation_active = True
+                conv_session_id = conv_logger.new_session_id()   # 이번 대화 세션 시작
                 report_conversation(True)   # 웨이크워드~ = 대화중 시작
 
             recorder = LiveRecorder(
@@ -662,6 +673,7 @@ def main() -> None:
             if wav_path is None:
                 print("💤 대화를 종료하고 웨이크워드 대기로 돌아갑니다.")
                 conversation_active = False
+                conv_session_id = None       # 세션 종료
                 report_conversation(False)   # 대화중 종료
                 continue
 
@@ -691,6 +703,15 @@ def main() -> None:
                 llm_out = chat_with_memory(groq_client, user_text, context, emotion)
             reply, robot_expr = llm_out["reply"], llm_out["expression"]
             print(f"🐻 모리: {reply}    [표정: {robot_expr}]")
+
+            # 대화 한 턴 로컬 저장(백엔드가 나중에 가져감). TTS 전에 저장해 재생 실패와 무관하게 남긴다.
+            conv_logger.log_turn(
+                user_text,
+                reply,
+                session_id=conv_session_id,
+                expression=robot_expr,
+                emotion=emotion,
+            )
 
             if face:
                 face.set_expression(robot_expr)
