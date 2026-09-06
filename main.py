@@ -213,8 +213,17 @@ def chat_with_memory(client: Groq, user_text: str, context: str,
             f"(신뢰도 {emotion['confidence']:.0%}, 표본 {emotion.get('n', 0)}장)."
         )
     full_system += (
-        "\n\n[출력 형식] 반드시 아래 JSON 형식으로만 답하세요. 다른 설명 없이 JSON만 출력합니다.\n"
-        '{"reply": "어르신께 할 말", "expression": "기쁨|슬픔|위로|경청|놀람|평온 중 하나"}'
+        "\n\n[위험 신호 판단] 어르신의 말에 아래에 해당하는 것이 있으면 risk 에 "
+        "그 값을 넣으세요. 없으면 none 입니다. 표현이 낯설어도 뜻으로 판단하세요.\n"
+        "- self_harm  : 죽고 싶다, 살기 싫다 등 스스로 목숨을 놓고 싶다는 뜻\n"
+        "- harm_others: 누군가를 죽이거나 해치고 싶다는 뜻\n"
+        "- medical    : 약을 더/덜 먹어도 되는지, 병원에 안 가도 되는지 등의 판단 요청\n"
+        "- abuse      : 누가 때리거나 밥을 안 주는 등 험한 일을 당했다는 이야기\n"
+        "'힘들어 죽겠다', '맛이 죽여준다' 같은 관용적인 강조는 none 입니다.\n"
+        "\n[출력 형식] 반드시 아래 JSON 형식으로만 답하세요. 다른 설명 없이 JSON만 출력합니다.\n"
+        '{"reply": "어르신께 할 말", '
+        '"expression": "기쁨|슬픔|위로|경청|놀람|평온 중 하나", '
+        '"risk": "none|self_harm|harm_others|medical|abuse"}'
     )
     resp = client.chat.completions.create(
         model=GROQ_MODEL,
@@ -237,7 +246,11 @@ def chat_with_memory(client: Groq, user_text: str, context: str,
     expression = data.get("expression") or "평온"
     if expression not in ROBOT_EXPRESSIONS:
         expression = "평온"
-    return {"reply": reply, "expression": expression}
+    # 모델이 아무 값이나 넣을 수 있으므로 아는 값만 받는다.
+    risk = data.get("risk")
+    if risk not in safety.LLM_KINDS:
+        risk = None
+    return {"reply": reply, "expression": expression, "risk": risk}
 
 
 def speak(text: str) -> None:
@@ -901,6 +914,21 @@ def main() -> None:
                         hint=(risk.hint if risk else None),
                     )
                 reply, robot_expr = llm_out["reply"], llm_out["expression"]
+
+                # 규칙이 놓친 낯선 어법은 LLM 이 받는다. 규칙은 적어 둔
+                # 표현만 알기 때문이다. 잡힌 뒤의 대응은 어느 쪽이 잡았든 같다.
+                if risk is None:
+                    risk = safety.from_llm(llm_out.get("risk"))
+                    if risk:
+                        print(f"🛡️  안전 신호(LLM): {risk.kind}")
+                        threading.Thread(
+                            target=report_safety,
+                            args=(risk.kind, user_text),
+                            daemon=True,
+                        ).start()
+                        # 정해진 말이 있는 종류는 모델이 쓴 답 대신 그걸 쓴다.
+                        if risk.reply:
+                            reply, robot_expr = risk.reply, risk.expression
             print(f"🐻 모리: {reply}    [표정: {robot_expr}]")
 
             # 말이 나가는 걸 늦추지 않도록 따로 보낸다.

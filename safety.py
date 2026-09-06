@@ -1,8 +1,17 @@
-"""어르신 말에서 위험 신호를 먼저 가려낸다.
+"""어르신 말에서 위험 신호를 가려낸다. 규칙과 LLM 두 겹으로 본다.
 
-LLM 을 부르기 전에 규칙으로 한 번 거른다. 왕복을 한 번 더 두면 응답이 그만큼
-늦어지고, 무엇보다 자해 신호를 놓쳤을 때 대가가 크기 때문이다. 한국어 자해
-표현은 패턴이 비교적 한정적이라 규칙으로 1차를 잡을 수 있다.
+규칙(classify)이 먼저다. LLM 이 못 미더워서가 아니라, 규칙만이 할 수 있는 일이
+둘 있어서다.
+
+  - 가족 알림이 모델의 자진 신고에 걸리지 않는다. 판별을 LLM 에만 맡기면
+    모델이 risk 를 안 채우는 순간 자해 알림이 조용히 안 간다. 가장 중요한
+    경로가 가장 조용하게 실패하는 셈이다.
+  - Groq 이 죽어도 동작한다. LLM 호출이 실패하면 그 턴은 통째로 날아가는데,
+    규칙은 네트워크와 무관하다.
+
+규칙은 적어 둔 표현만 안다. 처음 보는 어법은 새어 나가므로, 놓친 것은 LLM 이
+받는다(from_llm). 대화를 만드는 그 호출에 필드 하나를 얹는 것이라 왕복이
+늘지 않는다. 어느 쪽이 잡았든 그다음 대응은 같다.
 
 가려낸 뒤 하는 일은 종류마다 다르다.
 
@@ -29,6 +38,10 @@ HARM_OTHERS = "harm_others"
 MEDICAL = "medical"
 ABUSE = "abuse"
 PROFANITY = "profanity"
+
+# LLM 에게 판단을 맡기는 종류. 거친 말은 빼뒀다 — 규칙으로 충분하고,
+# 모델이 판단하게 하면 기준이 그때그때 달라진다.
+LLM_KINDS = {SELF_HARM, HARM_OTHERS, MEDICAL, ABUSE}
 
 
 @dataclass
@@ -100,6 +113,82 @@ def _first_match(text: str, patterns: list[str]) -> Optional[str]:
     return None
 
 
+def _self_harm(matched: str) -> Risk:
+    return Risk(
+        kind=SELF_HARM,
+        matched=matched,
+        # 모델에 맡기지 않는다. 이 자리에서 무슨 말이 나올지 모르는 채로
+        # 두면 안 된다. 캐묻지도, 훈계하지도 않고 곁에 있음만 전한다.
+        reply=(
+            "그런 마음이 드셨군요. 많이 힘드셨겠어요. "
+            "저는 여기 있어요. 가족분들께도 지금 말씀드릴게요."
+        ),
+        expression="위로",
+        alert=True,
+    )
+
+
+def _harm_others(matched: str) -> Risk:
+    return Risk(
+        kind=HARM_OTHERS,
+        matched=matched,
+        # 맞장구쳐도 안 되고 야단쳐도 안 된다. 공격성은 치매에서 흔한
+        # 증상이고 대개 통증·불편·혼란에서 온다. 화를 받아만 주고
+        # 무슨 일이었는지 털어놓게 해서 가라앉힌다.
+        reply=(
+            "화가 많이 나셨군요. 마음이 많이 상하셨나 봐요. "
+            "저랑 잠깐 숨 돌리시고, 무슨 일이 있었는지 편하게 말씀해 주세요."
+        ),
+        expression="위로",
+    )
+
+
+def _medical(matched: str) -> Risk:
+    return Risk(
+        kind=MEDICAL,
+        matched=matched,
+        reply=(
+            "그건 제가 판단할 일이 아니어서요. "
+            "가족분이나 의사 선생님께 꼭 여쭤보시는 게 좋겠어요."
+        ),
+        expression="경청",
+    )
+
+
+def _abuse(matched: str) -> Risk:
+    return Risk(
+        kind=ABUSE,
+        matched=matched,
+        # 사실 확인이 안 된 이야기다. 인형이 편들거나 판단하면 안 되고,
+        # 그렇다고 넘겨서도 안 된다. 받아만 주고 기록으로 남긴다.
+        hint=(
+            "[안전] 어르신이 누군가에게 험한 일을 당했다는 이야기를 하셨습니다. "
+            "사실인지 판단하거나 편들지 말고, 캐묻지도 마세요. "
+            "'많이 속상하셨겠어요' 처럼 마음만 받아주고, "
+            "'가족에게 알리겠다' 같은 약속은 하지 마세요."
+        ),
+        expression="위로",
+    )
+
+
+_BUILDERS = {
+    SELF_HARM: _self_harm,
+    HARM_OTHERS: _harm_others,
+    MEDICAL: _medical,
+    ABUSE: _abuse,
+}
+
+
+def from_llm(kind: Optional[str]) -> Optional[Risk]:
+    """LLM 이 잡아낸 신호를 규칙이 잡은 것과 같은 모양으로 만든다.
+
+    규칙이 놓친 낯선 어법을 여기서 받는다. 잡힌 뒤의 대응은 어느 쪽이
+    잡았든 같아야 하므로, Risk 를 만드는 곳을 한 군데로 둔다.
+    """
+    builder = _BUILDERS.get(kind or "")
+    return builder("LLM") if builder else None
+
+
 def classify(text: str) -> Optional[Risk]:
     """가장 위험한 것 하나만 준다. 걸리는 게 없으면 None.
 
@@ -111,63 +200,15 @@ def classify(text: str) -> Optional[Risk]:
     if not text:
         return None
 
-    m = _first_match(text, _SELF_HARM)
-    if m:
-        return Risk(
-            kind=SELF_HARM,
-            matched=m,
-            # 모델에 맡기지 않는다. 이 자리에서 무슨 말이 나올지 모르는 채로
-            # 두면 안 된다. 캐묻지도, 훈계하지도 않고 곁에 있음만 전한다.
-            reply=(
-                "그런 마음이 드셨군요. 많이 힘드셨겠어요. "
-                "저는 여기 있어요. 가족분들께도 지금 말씀드릴게요."
-            ),
-            expression="위로",
-            alert=True,
-        )
-
-    m = _first_match(text, _HARM_OTHERS)
-    if m:
-        return Risk(
-            kind=HARM_OTHERS,
-            matched=m,
-            # 맞장구쳐도 안 되고 야단쳐도 안 된다. 공격성은 치매에서 흔한
-            # 증상이고 대개 통증·불편·혼란에서 온다. 화를 받아만 주고
-            # 무슨 일이었는지 털어놓게 해서 가라앉힌다.
-            reply=(
-                "화가 많이 나셨군요. 마음이 많이 상하셨나 봐요. "
-                "저랑 잠깐 숨 돌리시고, 무슨 일이 있었는지 편하게 말씀해 주세요."
-            ),
-            expression="위로",
-        )
-
-    m = _first_match(text, _MEDICAL)
-    if m:
-        return Risk(
-            kind=MEDICAL,
-            matched=m,
-            reply=(
-                "그건 제가 판단할 일이 아니어서요. "
-                "가족분이나 의사 선생님께 꼭 여쭤보시는 게 좋겠어요."
-            ),
-            expression="경청",
-        )
-
-    m = _first_match(text, _ABUSE)
-    if m:
-        return Risk(
-            kind=ABUSE,
-            matched=m,
-            # 사실 확인이 안 된 이야기다. 인형이 편들거나 판단하면 안 되고,
-            # 그렇다고 넘겨서도 안 된다. 받아만 주고 기록으로 남긴다.
-            hint=(
-                "[안전] 어르신이 누군가에게 험한 일을 당했다는 이야기를 하셨습니다. "
-                "사실인지 판단하거나 편들지 말고, 캐묻지도 마세요. "
-                "'많이 속상하셨겠어요' 처럼 마음만 받아주고, "
-                "'가족에게 알리겠다' 같은 약속은 하지 마세요."
-            ),
-            expression="위로",
-        )
+    for patterns, kind in (
+        (_SELF_HARM, SELF_HARM),
+        (_HARM_OTHERS, HARM_OTHERS),
+        (_MEDICAL, MEDICAL),
+        (_ABUSE, ABUSE),
+    ):
+        m = _first_match(text, patterns)
+        if m:
+            return _BUILDERS[kind](m)
 
     m = _first_match(text, _PROFANITY)
     if m:

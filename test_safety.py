@@ -97,5 +97,30 @@ print("\n[빈 입력]")
 expect("", None)
 expect("   ", None)
 
+print("\n[LLM 이 잡은 신호] 규칙이 놓친 것을 받아 같은 대응으로 잇는다")
+
+
+def expect_llm(kind, want_reply: bool, want_alert: bool):
+    global fails
+    r = safety.from_llm(kind)
+    got = (r is not None, bool(r and r.reply), bool(r and r.alert))
+    want = (kind in safety.LLM_KINDS, want_reply, want_alert)
+    good = got == want
+    if not good:
+        fails += 1
+    print(f"  {OK if good else NG} from_llm({kind!r}) → {got}" +
+          ("" if good else f"  (기대 {want})"))
+
+
+expect_llm("self_harm", want_reply=True, want_alert=True)
+expect_llm("harm_others", want_reply=True, want_alert=False)
+expect_llm("medical", want_reply=True, want_alert=False)
+expect_llm("abuse", want_reply=False, want_alert=False)   # 모델이 쓴 답을 쓴다
+# 모델이 아무 값이나 넣어도 흘려보내지 않는다
+expect_llm("none", want_reply=False, want_alert=False)
+expect_llm("위험함", want_reply=False, want_alert=False)
+expect_llm(None, want_reply=False, want_alert=False)
+expect_llm("profanity", want_reply=False, want_alert=False)   # LLM 판단 대상이 아니다
+
 print(f"\n{'모두 통과' if fails == 0 else str(fails) + '건 실패'}")
 raise SystemExit(1 if fails else 0)
