@@ -252,6 +252,43 @@ def report_emotion(emotion: dict) -> None:
         print(f"⚠️  감정 기록 실패: {e}")
 
 
+def report_utterances(user_text: str, reply: str) -> None:
+    """방금 주고받은 말 한 턴을 백엔드에 남긴다.
+
+    리포트를 만드는 재료다. 서버가 7일 지난 것은 알아서 지우므로 인형은
+    그냥 보내기만 하면 된다. 실패해도 대화는 그대로 이어간다.
+    """
+    lines = []
+    if (user_text or "").strip():
+        lines.append({"speaker": "user", "content": user_text.strip()})
+    if (reply or "").strip():
+        lines.append({"speaker": "mori", "content": reply.strip()})
+    if not lines:
+        return
+    try:
+        requests.post(
+            f"{REMORY_API}/devices/{DEVICE_ID}/utterances",
+            json={"utterances": lines},
+            headers={"X-Device-Token": DEVICE_TOKEN},
+            timeout=30,
+        )
+    except Exception as e:
+        print(f"⚠️  발화 기록 실패: {e}")
+
+
+def report_activity(activity_type: str, content: str | None = None) -> None:
+    """어르신 일과 한 줄을 남긴다(앱 홈·리포트의 '일과')."""
+    try:
+        requests.post(
+            f"{REMORY_API}/devices/{DEVICE_ID}/activities",
+            json={"activityType": activity_type, "content": content},
+            headers={"X-Device-Token": DEVICE_TOKEN},
+            timeout=30,
+        )
+    except Exception as e:
+        print(f"⚠️  활동 기록 실패: {e}")
+
+
 # 대화중 보고 대기열. 웨이크워드 직후에 보내는 신호라 녹음 시작을 막으면 안 되고,
 # 시작/종료가 뒤집혀 도착하면 앱이 계속 '대화중'으로 남는다. 그래서 한 줄로 세워 보낸다.
 _conversation_queue: "queue.Queue[bool]" = queue.Queue()
@@ -327,14 +364,8 @@ def medication_worker(face=None) -> None:
                     else:
                         text = f"{m['name']} 드실 시간이에요. 잊지 말고 꼭 챙겨 드세요."
                     _speak_when_free(text, face)
-                    try:
-                        requests.post(
-                            f"{REMORY_API}/devices/{DEVICE_ID}/activities",
-                            json={"activityType": "복약알림", "content": m["name"]},
-                            headers=headers, timeout=30,
-                        )
-                    except Exception as e:
-                        print(f"⚠️  복약 활동 기록 실패: {e}")
+                    # 앱이 아이콘·문구를 코드로 고르므로 한글이 아니라 코드로 남긴다.
+                    report_activity("MEDICATION", m["name"])
 
                     # 복용 확인이 켜져 있으면 15분 뒤에 한 번 더 챙겨 묻는다.
                     if med_check:
@@ -614,6 +645,8 @@ def main() -> None:
 
     consecutive_errors = 0
     conversation_active = False
+    # 이번 대화(웨이크워드~종료)에서 몇 번 주고받았는지. 끝날 때 일과로 남긴다.
+    turns_this_session = 0
 
     while True:
         try:
@@ -628,6 +661,7 @@ def main() -> None:
                     continue
                 print("🎤 말씀하세요.")
                 conversation_active = True
+                turns_this_session = 0
                 report_conversation(True)   # 웨이크워드~ = 대화중 시작
 
             recorder = LiveRecorder(
@@ -663,6 +697,12 @@ def main() -> None:
                 print("💤 대화를 종료하고 웨이크워드 대기로 돌아갑니다.")
                 conversation_active = False
                 report_conversation(False)   # 대화중 종료
+                # 한 마디도 못 나눈 헛걸음은 일과에 남기지 않는다.
+                if turns_this_session:
+                    report_activity(
+                        "DAILY_CONVERSATION", f"{turns_this_session}번 주고받았어요"
+                    )
+                    turns_this_session = 0
                 continue
 
             # ② STT
@@ -691,6 +731,12 @@ def main() -> None:
                 llm_out = chat_with_memory(groq_client, user_text, context, emotion)
             reply, robot_expr = llm_out["reply"], llm_out["expression"]
             print(f"🐻 모리: {reply}    [표정: {robot_expr}]")
+
+            # 말이 나가는 걸 늦추지 않도록 따로 보낸다.
+            turns_this_session += 1
+            threading.Thread(
+                target=report_utterances, args=(user_text, reply), daemon=True
+            ).start()
 
             if face:
                 face.set_expression(robot_expr)
@@ -734,6 +780,8 @@ def main() -> None:
     # 어떤 이유로 멈추든 앱에 '대화중'이 남지 않게 한다.
     # 곧 프로세스가 끝나므로 대기열 대신 직접 보낸다.
     send_conversation(False)
+    if turns_this_session:
+        report_activity("DAILY_CONVERSATION", f"{turns_this_session}번 주고받았어요")
 
     if emotion_svc:
         emotion_svc.close()
