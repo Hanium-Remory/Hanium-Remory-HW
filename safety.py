@@ -1,0 +1,149 @@
+"""어르신 말에서 위험 신호를 먼저 가려낸다.
+
+LLM 을 부르기 전에 규칙으로 한 번 거른다. 왕복을 한 번 더 두면 응답이 그만큼
+늦어지고, 무엇보다 자해 신호를 놓쳤을 때 대가가 크기 때문이다. 한국어 자해
+표현은 패턴이 비교적 한정적이라 규칙으로 1차를 잡을 수 있다.
+
+가려낸 뒤 하는 일은 종류마다 다르다.
+
+  자해   LLM 을 거치지 않고 정해진 말로 답한다. 모델이 무슨 말을 할지
+         모르는 채로 두면 안 되는 자리다. 가족에게 바로 알린다.
+  의료   약·치료 판단은 인형이 할 일이 아니다. 가족에게 여쭙도록 넘긴다.
+  학대   기록만 남긴다. 사실 확인이 안 된 정황이고, 실시간 알림은 오히려
+         어르신을 위험하게 만들 수 있다(아래 ABUSE 설명 참고).
+  거친말 훈계하지 않는다. 치매의 탈억제는 증상이지 악의가 아니다. 감정을
+         받아준 뒤 화제를 옮기도록 LLM 에 지침만 얹고, 횟수를 기록한다.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from typing import Optional
+
+# 종류. 백엔드 safety_events.kind 와 같은 값을 쓴다.
+SELF_HARM = "self_harm"
+MEDICAL = "medical"
+ABUSE = "abuse"
+PROFANITY = "profanity"
+
+
+@dataclass
+class Risk:
+    kind: str
+    matched: str                    # 무엇에 걸렸는지 (기록·디버깅용)
+    reply: Optional[str] = None     # LLM 을 거치지 않고 바로 할 말
+    hint: Optional[str] = None      # LLM 에 얹을 지침
+    expression: str = "위로"
+    alert: bool = False             # 가족에게 즉시 알릴지
+
+
+# ── 자해·자살 ────────────────────────────────────────
+# '죽겠다' 는 뺐다. "힘들어 죽겠다", "배고파 죽겠어" 처럼 한국어에서 아주 흔한
+# 강조 표현이라, 넣으면 거의 매일 걸린다.
+_SELF_HARM = [
+    r"죽고\s*싶", r"죽었으면\s*좋겠", r"살기\s*싫", r"살고\s*싶지\s*않",
+    r"그만\s*살", r"목숨\S*\s*끊", r"자살", r"세상\S*\s*뜨고\s*싶",
+    r"따라\s*죽", r"확\s*죽어", r"없어져야",
+]
+
+# ── 의료 판단 ────────────────────────────────────────
+_MEDICAL = [
+    r"약\S*\s*(더|두\s*알|세\s*알|여러|많이)\s*먹",
+    r"약\S*\s*먹어도\s*(되|괜찮)", r"약\S*\s*안\s*먹어도",
+    r"약\S*\s*바꿔도", r"약\S*\s*끊어도",
+    r"병원\s*안\s*가도", r"수술\S*\s*해야",
+    r"무슨\s*약\S*\s*먹", r"어떤\s*약\S*\s*먹",
+]
+
+# ── 학대·방임 정황 ───────────────────────────────────
+# '맞았' 은 뺐다 — "그 말이 맞았어" 처럼 '옳다' 는 뜻으로 훨씬 자주 쓰인다.
+_ABUSE = [
+    r"때렸", r"때려", r"때리", r"밥\S*\s*안\s*주", r"굶기",
+    r"가둬", r"가뒀", r"내쫓", r"돈\S*\s*가져가",
+]
+
+# ── 거친 말 ──────────────────────────────────────────
+_PROFANITY = [
+    r"씨발", r"시발", r"씹", r"좆", r"개새끼", r"새끼야", r"병신",
+    r"지랄", r"닥쳐", r"미친놈", r"미친년", r"등신", r"염병",
+]
+
+
+def _first_match(text: str, patterns: list[str]) -> Optional[str]:
+    for p in patterns:
+        m = re.search(p, text)
+        if m:
+            return m.group(0)
+    return None
+
+
+def classify(text: str) -> Optional[Risk]:
+    """가장 위험한 것 하나만 준다. 걸리는 게 없으면 None.
+
+    순서가 곧 우선순위다. 한 문장에 여러 개가 섞여 있으면 더 급한 쪽을 따른다
+    ("죽고 싶은데 며느리가 밥도 안 줘" 는 자해로 다룬다).
+    """
+    text = (text or "").strip()
+    if not text:
+        return None
+
+    m = _first_match(text, _SELF_HARM)
+    if m:
+        return Risk(
+            kind=SELF_HARM,
+            matched=m,
+            # 모델에 맡기지 않는다. 이 자리에서 무슨 말이 나올지 모르는 채로
+            # 두면 안 된다. 캐묻지도, 훈계하지도 않고 곁에 있음만 전한다.
+            reply=(
+                "그런 마음이 드셨군요. 많이 힘드셨겠어요. "
+                "저는 여기 있어요. 가족분들께도 지금 말씀드릴게요."
+            ),
+            expression="위로",
+            alert=True,
+        )
+
+    m = _first_match(text, _MEDICAL)
+    if m:
+        return Risk(
+            kind=MEDICAL,
+            matched=m,
+            reply=(
+                "그건 제가 판단할 일이 아니어서요. "
+                "가족분이나 의사 선생님께 꼭 여쭤보시는 게 좋겠어요."
+            ),
+            expression="경청",
+        )
+
+    m = _first_match(text, _ABUSE)
+    if m:
+        return Risk(
+            kind=ABUSE,
+            matched=m,
+            # 사실 확인이 안 된 이야기다. 인형이 편들거나 판단하면 안 되고,
+            # 그렇다고 넘겨서도 안 된다. 받아만 주고 기록으로 남긴다.
+            hint=(
+                "[안전] 어르신이 누군가에게 험한 일을 당했다는 이야기를 하셨습니다. "
+                "사실인지 판단하거나 편들지 말고, 캐묻지도 마세요. "
+                "'많이 속상하셨겠어요' 처럼 마음만 받아주고, "
+                "'가족에게 알리겠다' 같은 약속은 하지 마세요."
+            ),
+            expression="위로",
+        )
+
+    m = _first_match(text, _PROFANITY)
+    if m:
+        return Risk(
+            kind=PROFANITY,
+            matched=m,
+            # 훈계하지 않는다. 탈억제는 증상이고, 초조함은 통증이나 불편의
+            # 신호일 때가 많다. 야단치면 그 신호를 덮어버린다.
+            hint=(
+                "[안전] 어르신이 거친 말을 하셨습니다. 절대 훈계하거나 "
+                "지적하지 마세요. 그 말에 담긴 감정(짜증·답답함)을 한 마디로 "
+                "받아준 뒤, 편안한 다른 화제로 부드럽게 옮기세요."
+            ),
+            expression="위로",
+        )
+
+    return None
