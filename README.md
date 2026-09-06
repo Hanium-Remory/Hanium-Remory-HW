@@ -89,21 +89,13 @@ Flutter 앱으로 어르신 상태를 보고,
 
 ---
 
-## 🔁 한 턴이 흘러가는 길
+## 🔁 동작 흐름
 
-```mermaid
-flowchart LR
-    W["👂 웨이크워드<br/>moriya_v1.onnx"] --> R["🎙 VAD 녹음<br/>webrtcvad"]
-    R --> S["📝 STT<br/>Whisper-base @ Hailo"]
-    R -. 발화 구간 .-> E["📷 감정 인식<br/>YuNet + HSEmotion"]
-    S --> G["🧠 RAG 검색<br/>Chroma + ko-sroberta"]
-    E --> L
-    G --> L["💬 LLM<br/>Groq · reply + 표정"]
-    L --> T["🔊 TTS 스트리밍<br/>CosyVoice2"]
-    L --> F["🖥 LCD 표정<br/>WebSocket → 브라우저"]
-    T --> P["🔉 스피커 재생<br/>aplay"]
-    L --> J["💾 대화 로그<br/>JSONL"]
-```
+<div align="center">
+  <img src="assets/ReMory_conversation_flow.png" alt="모리 동작 흐름" width="100%" />
+</div>
+
+> 🚧 **근접 감지는 아직 구현 전입니다.** 지금은 "모리야" 웨이크워드로만 깨어납니다.
 
 **동시에 백그라운드에서 도는 것들**
 

@@ -16,6 +16,9 @@ models/
 *.jpg
 *.jpeg
 *.png
+# 단, 리드미에 쓰는 그림은 예외
+!assets/*.png
+!assets/*.jpg
 *.wav
 *.json
 *.csv
