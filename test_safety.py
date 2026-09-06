@@ -36,6 +36,32 @@ expect("배고파 죽겠다", None)
 expect("좋아 죽겠어 손주 온다니까", None)
 expect("허리가 아파 죽겠어", None)
 
+print("\n[자해·자살] 보조용언 '-어버리-' 가 껴도 어미가 기준이다")
+expect("죽어버리고 싶어", safety.SELF_HARM, "← ~고 싶 : 욕구")
+expect("그냥 죽어버렸으면 좋겠어", safety.SELF_HARM, "← ~었으면 : 소망")
+expect("확 죽어버릴까", safety.SELF_HARM)
+expect("힘들어 죽어버리겠네", None, "← ~겠 : 강조 관용구")
+expect("아이고 죽어버리겠다", None)
+
+print("\n[자해·자살] 체념조도 소극적 자살 사고로 본다")
+expect("이제 죽어야지", safety.SELF_HARM)
+expect("빨리 죽어야지 자식들 고생시키지 말고", safety.SELF_HARM)
+
+print("\n[우선순위] '때려치우다' 는 폭력이 아니다")
+expect("다 때려치우고 죽어버리고 싶다", safety.SELF_HARM, "← 학대로 새면 알림이 안 간다")
+expect("일 때려치웠어", None)
+
+print("\n[타해] 자해는 '죽어-', 타해는 '죽여-' — 한 글자 차이다")
+expect("저 놈 죽여버리고 싶어", safety.HARM_OTHERS)
+expect("확 죽여버릴까", safety.HARM_OTHERS)
+expect("죽이고 싶을 만큼 밉다", safety.HARM_OTHERS)
+expect("때려죽이고 싶어", safety.HARM_OTHERS)
+expect("죽어버리고 싶어", safety.SELF_HARM, "← 한 글자 차이지만 자해다")
+
+print("\n[타해] '죽여준다' 는 칭찬이다")
+expect("이 노래 죽여준다", None)
+expect("맛이 죽여주네", None)
+
 print("\n[의료] 잡아야 하는 것")
 expect("이 약 두 알 먹어도 되나?", safety.MEDICAL)
 expect("약 안 먹어도 괜찮겠지?", safety.MEDICAL)
