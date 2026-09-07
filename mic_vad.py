@@ -8,14 +8,22 @@ stt4vad.py 의 VAD 알고리즘을 스트리밍 버전으로 이식.
     from mic_vad import LiveRecorder
     rec = LiveRecorder()
     wav_path = rec.record_until_silence("input.wav")
+
+말끝 감지가 잘 안 될 때(계속 녹음됨):
+    VAD_DEBUG=1 python main.py 로 실행하면 프레임마다 에너지(e)·VAD 값이 찍힌다.
+    조용히 있을 때 찍히는 e 값보다 살짝 높게 min_energy_threshold 를 잡으면 된다.
 """
 
+import os
 import wave
 from collections import deque
 
 import numpy as np
 import pyaudio
 import webrtcvad
+
+# 켜면 프레임마다 에너지/VAD 판정을 출력한다(문턱값 보정용).
+VAD_DEBUG = bool(os.getenv("VAD_DEBUG"))
 
 
 class LiveRecorder:
@@ -25,7 +33,7 @@ class LiveRecorder:
         chunk_duration_ms: int = 30,
         vad_aggressiveness: int = 2,
         silence_end_ms: int = 1000,
-        max_record_seconds: int = 30,
+        max_record_seconds: int = 15,
         min_energy_threshold: float = 600.0,
         input_device_index: int | None = None,
     ):
@@ -100,6 +108,10 @@ class LiveRecorder:
                 is_speech = self.vad.is_speech(data, self.rate)
                 valid_speech = is_speech and energy > self.min_energy_threshold
 
+                if VAD_DEBUG:
+                    print(f"e={energy:6.0f}  vad={int(is_speech)}  valid={int(valid_speech)}"
+                          f"  sil={silence_run}/{silence_end_frames}")
+
                 if not recording_started:
                     waited_frames += 1
 
@@ -128,11 +140,11 @@ class LiveRecorder:
                     frames.append(data)
                     total_recorded_frames += 1
 
-                    # 말끝 침묵 누적. 단, '지속된' 음성(2프레임 이상)일 때만 침묵 카운터 리셋
-                    # → 침묵 구간에 끼는 단발성 VAD 오탐 때문에 종료가 안 되던 문제 해결.
+                    # 말끝 침묵 누적. 단, '지속된' 음성(3프레임 이상)일 때만 침묵 카운터 리셋
+                    # → 침묵 구간에 끼는 짧은 VAD 오탐(1~2프레임)으로 종료가 안 되던 문제 해결.
                     if valid_speech:
                         speech_run += 1
-                        if speech_run >= 2:
+                        if speech_run >= 3:
                             silence_run = 0
                     else:
                         speech_run = 0

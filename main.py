@@ -78,7 +78,7 @@ recording = threading.Event()
 MIC_DEVICE_INDEX = None
 
 WAKEWORD_DEVICE_INDEX = None
-WAKEWORD_THRESHOLD = 0.65
+WAKEWORD_THRESHOLD = 0.9
 
 CONVERSATION_IDLE_TIMEOUT_SEC = 15
 
@@ -92,6 +92,7 @@ TIMING_ORDER = ["녹음+VAD", "STT", "RAG", "LLM", "TTS 합성", "TTS 재생"]
 
 # 하이픈 들어간 폴더는 직접 import 불가 → sys.path 주입
 ROOT = Path(__file__).resolve().parent
+CONVERSATION_LOG_DIR = os.getenv("CONVERSATION_LOG_DIR", str(ROOT / "conversations"))
 sys.path.insert(0, str(ROOT / "stt"))
 sys.path.insert(0, str(ROOT / "rag"))
 sys.path.insert(0, str(ROOT / "emotion"))
