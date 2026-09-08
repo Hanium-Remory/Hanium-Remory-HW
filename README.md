@@ -147,7 +147,7 @@ Flutter 앱으로 어르신 상태를 보고,
 | 영역 | 사용 기술 | 메모 |
 |---|---|---|
 | **본체** | Raspberry Pi 5 + AI HAT+ (Hailo-8) | 온디바이스 STT 가속 |
-| **웨이크워드** | openWakeWord + 자체 학습 `moriya_v1.onnx` | CPU 추론, 0.25초 간격 · threshold 0.65 |
+| **웨이크워드** | openWakeWord + 자체 학습 `moriya_v1.onnx` | CPU 추론, 0.25초 간격 · threshold 0.9 |
 | **녹음/VAD** | PyAudio + `webrtcvad` (aggressiveness 2) | RMS 에너지 게이트 병행, 말끝 침묵 2초로 종료 |
 | **STT** | Whisper-base `.hef` @ Hailo GenAI | `small.hef` 은 언어 파라미터 무시 버그가 있어 base 사용 |
 | **감정 인식** | YuNet(얼굴 검출) + HSEmotion(AffectNet 8감정) | picamera2 · 0.7초 간격 샘플 → 신뢰도 가중 다수결 |
