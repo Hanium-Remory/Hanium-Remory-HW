@@ -39,16 +39,15 @@ load_dotenv()
 PATIENT_ID    = "P001"                       # RAG/chroma_db/ 안에 폴더로 존재해야 함
 
 GROQ_MODEL    = "openai/gpt-oss-120b"
-# CosyVoice2 TTS 서버(2080). URL/키는 .env로 주입 가능(코드에 고정 X).
-TTS_API_URL   = os.getenv("TTS_API_URL", "http://100.101.194.59:8000/tts")
-TTS_STREAM_API_URL = os.getenv("TTS_STREAM_API_URL", "http://100.101.194.59:8001/tts_stream")
-TTS_API_KEY   = os.getenv("TTS_API_KEY", "morri1234")
+# CosyVoice2 TTS 서버(2080). URL/키는 .env로 주입 
+TTS_STREAM_API_URL = os.environ["TTS_STREAM_API_URL"]
+TTS_API_KEY   = os.environ["TTS_API_KEY"]
 RAG_TOP_K     = 3
 
 # ── 백엔드(ReMory 서버) 연결 ──────────────────────────────────
-REMORY_API    = os.getenv("REMORY_API", "https://remory-passkey-hanium.onrender.com")
-DEVICE_ID     = os.getenv("DEVICE_ID", "1")
-DEVICE_TOKEN  = os.getenv("DEVICE_TOKEN", "Fy5JbTV4OFZ9eq6cwoF7cD8IMe1_0aG6le0y0lF1fAM")
+REMORY_API    = os.environ["REMORY_API"]
+DEVICE_ID     = os.environ["DEVICE_ID"]
+DEVICE_TOKEN  = os.environ["DEVICE_TOKEN"]
 # 약 시간을 몇 초마다 확인할지.
 MEDICATION_CHECK_INTERVAL_SEC = 30
 # 약 알림 후 몇 초 뒤에 "드셨어요?" 하고 복용을 다시 챙겨줄지
@@ -445,7 +444,7 @@ def medication_worker(face=None) -> None:
                     # 앱이 아이콘·문구를 코드로 고르므로 한글이 아니라 코드로 남긴다.
                     report_activity("MEDICATION", m["name"])
 
-                    # 복용 확인이 켜져 있으면 15분 뒤에 한 번 더 챙겨 묻는다.
+                    # 복용 확인이 켜져 있으면 일정시간 뒤에 한 번 더 챙겨 묻는다.
                     if med_check:
                         threading.Timer(
                             MED_CONFIRM_DELAY_SEC, _confirm_medication,
@@ -457,12 +456,6 @@ def medication_worker(face=None) -> None:
         time.sleep(MEDICATION_CHECK_INTERVAL_SEC)
 
 
-# 사진을 내릴 타이머. 사진이 잇따라 오면 앞 메시지의 타이머가 뒤 사진을
-# 일찍 내려버리므로, 새 사진을 띄울 때 앞 타이머를 취소한다.
-#
-# 취소만으로는 부족하다 — 앞 타이머가 이미 울리기 시작한 참이면 cancel 이
-# 먹지 않아, 갓 올라온 사진을 그 타이머가 내려버린다. 그래서 사진마다 번호를
-# 붙이고, 타이머는 자기 번호가 아직 최신일 때만 내린다.
 _photo_timer: threading.Timer | None = None
 _photo_seq = 0
 # 지금 화면에 떠 있는 사진. 안내가 잠깐 가렸다가 내려갈 때 다시 보여주려고 든다.

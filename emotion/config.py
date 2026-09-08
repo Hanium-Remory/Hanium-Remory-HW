@@ -19,25 +19,6 @@ FRAMES_PER_UTTERANCE = 3
 FACE_SCORE_THRESHOLD = 0.5
 FACE_NMS_THRESHOLD   = 0.3
 
-# ── 오디오 / VAD ─────────────────────────────────────────
-SAMPLE_RATE      = 16000     # webrtcvad / whisper 둘 다 16kHz 요구
-FRAME_MS         = 30        # VAD 프레임 길이 (10/20/30 중 하나)
-VAD_MODE         = 2         # 0~3, 클수록 공격적. 노인 음성은 2 정도가 무난
-SILENCE_END_MS   = 800       # 이만큼 침묵이 지속되면 발화 종료로 판단
-MIN_UTTER_MS     = 400       # 이보다 짧으면 잡음으로 보고 버림
-MAX_UTTER_MS     = 15000     # 안전장치: 너무 긴 발화는 끊음
-
-# ── STT (faster-whisper) ─────────────────────────────────
-WHISPER_MODEL    = "base"    # 파이5 한국어 스위트스폿. 느리면 'tiny', 정확↑면 'small'
-WHISPER_COMPUTE  = "int8"    # CPU 양자화
-WHISPER_LANG     = "ko"
-# 사용자 이름/자주 쓰는 단어를 넣어두면 인식률이 올라감(프롬프트 앵커링)
-WHISPER_PROMPT   = "어르신과의 일상 대화입니다."
-
-# ── LLM (클라우드) ───────────────────────────────────────
-LLM_MODEL        = "gpt-4o-mini"   # Gemini 쓰려면 llm.py 주석 참고
-LLM_API_KEY_ENV  = "OPENAI_API_KEY"
-
 # ── 감정 라벨 ─────────────────────────────────────────────
 # 지금 로드한 모델에 맞는 블록 '하나만' 활성화.
 
