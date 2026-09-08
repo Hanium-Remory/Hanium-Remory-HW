@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="580" viewBox="0 0 1560 580" font-family="'Pretendard','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif">
+  <defs>
+    <filter id="sh" x="-20%" y="-40%" width="140%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#7C8698" flood-opacity="0.14"/>
+    </filter>
+    <style>
+      .hd  { font-size:17px; fill:#FFFFFF; text-anchor:middle; font-weight:800; }
+      .sen { font-size:16.5px; fill:#39404D; font-weight:600; }
+      .note{ font-size:11.5px; fill:#8A93A0; font-weight:500; }
+      .foot{ font-size:13px; fill:#5A6472; font-weight:600; text-anchor:middle; }
+    </style>
+  </defs>
+  <rect width="100%" height="100%" fill="#FFFFFF"/>
+  <rect x="40" y="36" width="700" height="40" rx="20" fill="#D9705F"/>
+  <text class="hd" x="390.0" y="62">자해로 잡는다  →  고정 응답 · 가족 즉시 알림</text>
+  <rect x="40" y="108" width="700" height="64" rx="14" fill="#FCE7E4" stroke="#EE9285" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="64" y="135">“<tspan fill="#C0574A" font-weight="800">죽고 싶</tspan>다”</text>
+  <text class="note" x="64" y="156">규칙 죽(어버리|어)?고 싶 에 걸린다</text>
+  <rect x="40" y="182" width="700" height="64" rx="14" fill="#FCE7E4" stroke="#EE9285" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="64" y="209">“<tspan fill="#C0574A" font-weight="800">죽어버리고 싶</tspan>어”</text>
+  <text class="note" x="64" y="230">보조용언 ‘-어버리-’ 가 껴도 뜻은 같아 함께 받는다</text>
+  <rect x="40" y="256" width="700" height="64" rx="14" fill="#FCE7E4" stroke="#EE9285" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="64" y="283">“이제 <tspan fill="#C0574A" font-weight="800">그만 살</tspan>고 싶어”</text>
+  <text class="note" x="64" y="304">‘살기 싫’ · ‘그만 살’ 계열</text>
+  <rect x="40" y="330" width="700" height="64" rx="14" fill="#FCE7E4" stroke="#EE9285" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="64" y="357">“이제 <tspan fill="#C0574A" font-weight="800">죽어야지</tspan>”</text>
+  <text class="note" x="64" y="378">체념조지만 노인 돌봄에서는 소극적 자살 사고로 본다</text>
+  <rect x="40" y="404" width="700" height="64" rx="14" fill="#FCE7E4" stroke="#EE9285" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="64" y="431">“다 때려치우고 <tspan fill="#C0574A" font-weight="800">죽어버리고 싶</tspan>다”</text>
+  <text class="note" x="64" y="452">앞의 ‘때려’ 는 학대로 잡히지 않는다</text>
+  <rect x="40" y="478" width="700" height="64" rx="14" fill="#FCE7E4" stroke="#EE9285" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="64" y="505">“<tspan fill="#C0574A" font-weight="800">목숨을 끊</tspan>고 싶어”</text>
+  <text class="note" x="64" y="526">직접적인 표현</text>
+  <rect x="820" y="36" width="700" height="40" rx="20" fill="#5AA383"/>
+  <text class="hd" x="1170.0" y="62">잡지 않는다  →  평소처럼 대화</text>
+  <rect x="820" y="108" width="700" height="64" rx="14" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="844" y="135">“힘들어 <tspan fill="#3D8C69" font-weight="800">죽겠다</tspan>”</text>
+  <text class="note" x="844" y="156">어미 ‘~겠’ — 욕구가 아니라 강조 관용구</text>
+  <rect x="820" y="182" width="700" height="64" rx="14" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="844" y="209">“배고파 <tspan fill="#3D8C69" font-weight="800">죽겠어</tspan>”</text>
+  <text class="note" x="844" y="230">같은 관용구. 하루에도 몇 번씩 나온다</text>
+  <rect x="820" y="256" width="700" height="64" rx="14" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="844" y="283">“<tspan fill="#3D8C69" font-weight="800">죽어버리겠</tspan>네”</text>
+  <text class="note" x="844" y="304">‘-어버리-’ 가 껴도 어미가 ‘~겠’ 이면 그대로 통과</text>
+  <rect x="820" y="330" width="700" height="64" rx="14" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="844" y="357">“맛이 <tspan fill="#3D8C69" font-weight="800">죽여주</tspan>네”</text>
+  <text class="note" x="844" y="378">타해는 ‘죽여-’ 로 보지만 칭찬의 ‘죽여주다’ 는 뺐다</text>
+  <rect x="820" y="404" width="700" height="64" rx="14" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="844" y="431">“그 말이 <tspan fill="#3D8C69" font-weight="800">맞았</tspan>어”</text>
+  <text class="note" x="844" y="452">‘옳다’ 는 뜻이 훨씬 흔해 학대 규칙에서 아예 제외했다</text>
+  <rect x="820" y="478" width="700" height="64" rx="14" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.5" filter="url(#sh)"/>
+  <text class="sen" x="844" y="505">“다 <tspan fill="#3D8C69" font-weight="800">때려치우</tspan>고 싶다”</text>
+  <text class="note" x="844" y="526">‘때려치우다’ 는 그만두다 — 폭력이 아니다</text>
+  <text class="foot" x="780.0" y="570">가르는 것은 동사가 아니라 어미다 — ‘~고 싶’(욕구) · ‘~었으면’(소망) 은 잡고, ‘~겠’(강조) 은 잡지 않는다</text>
+</svg>

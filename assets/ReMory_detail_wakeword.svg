@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="420" viewBox="0 0 1560 420" font-family="'Pretendard','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0.8 L9,5 L0,9.2 Z" fill="#B7BDC7"/>
+    </marker>
+    <filter id="sh" x="-20%" y="-40%" width="140%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#7C8698" flood-opacity="0.16"/>
+    </filter>
+    <style>
+      .ln  { fill:none; stroke:#B7BDC7; stroke-width:2; stroke-linecap:round; marker-end:url(#ah); }
+      .br  { fill:none; stroke:#C6CCD6; stroke-width:1.6; stroke-linecap:round; }
+      .t   { font-size:15.5px; fill:#39404D; text-anchor:middle; font-weight:700; }
+      .s   { font-size:10.5px; fill:#8A93A0; text-anchor:middle; font-weight:500; }
+      .c   { font-size:11px; fill:#4A5361; text-anchor:middle; font-weight:600; font-family:'SF Mono','Menlo','D2Coding','Consolas',monospace; }
+      .n   { font-size:11px; fill:#8A93A0; text-anchor:middle; font-weight:600; }
+      .cap { font-size:12.5px; fill:#5A6472; text-anchor:middle; font-weight:700; }
+      .lg  { font-size:11.5px; fill:#8A93A0; font-weight:600; }
+    </style>
+  </defs>
+  <rect width="100%" height="100%" fill="#FFFFFF"/>
+  <path class="ln" d="M255,250 L297,250"/>
+  <path class="ln" d="M507,250 L549,250"/>
+  <path class="ln" d="M759,250 L801,250"/>
+  <path class="ln" d="M1011,250 L1053,250"/>
+  <path class="ln" d="M1263,250 L1305,250"/>
+  <rect x="45" y="198" width="210" height="104" rx="16" fill="#EAF2FD" stroke="#A8C5EC" stroke-width="1.8" filter="url(#sh)"/>
+  <text class="t" x="150" y="228">마이크 입력</text>
+  <text class="s" x="150" y="248">16kHz 모노 · 80ms 블록</text>
+  <rect x="102" y="262" width="96" height="24" rx="12" fill="#D6E5F8"/>
+  <text class="c" x="150" y="278">int16 스트림</text>
+  <rect x="297" y="198" width="210" height="104" rx="16" fill="#EAF2FD" stroke="#A8C5EC" stroke-width="1.8" filter="url(#sh)"/>
+  <text class="t" x="402" y="228">링 버퍼</text>
+  <text class="s" x="402" y="248">최근 2.1초만 유지</text>
+  <rect x="354" y="262" width="96" height="24" rx="12" fill="#D6E5F8"/>
+  <text class="c" x="402" y="278">33,600 샘플</text>
+  <rect x="549" y="198" width="210" height="104" rx="16" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.8" filter="url(#sh)"/>
+  <text class="t" x="654" y="228">멜 스펙트로그램</text>
+  <text class="s" x="654" y="248">melspectrogram.onnx</text>
+  <rect x="606" y="262" width="96" height="24" rx="12" fill="#D8EDE2"/>
+  <text class="c" x="654" y="278">멜 프레임</text>
+  <rect x="801" y="198" width="210" height="104" rx="16" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.8" filter="url(#sh)"/>
+  <text class="t" x="906" y="228">임베딩 추출</text>
+  <text class="s" x="906" y="248">embedding_model.onnx</text>
+  <rect x="858" y="262" width="96" height="24" rx="12" fill="#D8EDE2"/>
+  <text class="c" x="906" y="278">(16, 96)</text>
+  <rect x="1053" y="198" width="210" height="104" rx="16" fill="#FCE7E4" stroke="#EE9285" stroke-width="1.8" filter="url(#sh)"/>
+  <text class="t" x="1158" y="228">분류기</text>
+  <text class="s" x="1158" y="248">moriya_v1.onnx</text>
+  <rect x="1093" y="262" width="130" height="24" rx="12" fill="#F8D3CE"/>
+  <text class="c" x="1158" y="278">logit → sigmoid</text>
+  <rect x="1305" y="198" width="210" height="104" rx="16" fill="#FDF7E7" stroke="#E8CE86" stroke-width="1.8" filter="url(#sh)"/>
+  <text class="t" x="1410" y="228">판정</text>
+  <text class="s" x="1410" y="248">score ≥ 0.9 이면 감지</text>
+  <rect x="1359" y="262" width="101" height="24" rx="12" fill="#F7E9C6"/>
+  <text class="c" x="1410" y="278">score 0 ~ 1</text>
+  <path class="br" d="M549.0,164 L549.0,152 L1515.0,152 L1515.0,164"/>
+  <text class="cap" x="1032" y="142">0.25초 간격으로만 추론 — 파이 CPU 에서 상시 도는 유일한 모델이라 4Hz 로 묶었다</text>
+  <text class="n" x="906" y="322">프레임이 모자라면 앞쪽을 0으로 채운다</text>
+  <text class="n" x="1410" y="322">감지 직후 2초는 다시 감지하지 않는다</text>
+  <rect x="60" y="362" width="15" height="15" rx="5" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.4"/>
+  <text class="lg" x="82" y="374">openWakeWord 공개 모델</text>
+  <rect x="290" y="362" width="15" height="15" rx="5" fill="#FCE7E4" stroke="#EE9285" stroke-width="1.4"/>
+  <text class="lg" x="312" y="374">직접 녹음해 학습한 모델</text>
+</svg>

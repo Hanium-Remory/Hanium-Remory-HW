@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="720" viewBox="0 0 1840 720" font-family="'Pretendard','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0.8 L9,5 L0,9.2 Z" fill="#B7BDC7"/>
+    </marker>
+    <filter id="sh" x="-20%" y="-40%" width="140%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#7C8698" flood-opacity="0.16"/>
+    </filter>
+    <style>
+      .ln  { fill:none; stroke:#B7BDC7; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; marker-end:url(#ah); }
+      .ln0 { fill:none; stroke:#B7BDC7; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+      .t   { font-size:14.5px; fill:#39404D; text-anchor:middle; font-weight:700; }
+      .d   { font-size:13.5px; fill:#39404D; text-anchor:middle; font-weight:700; }
+      .s   { font-size:11px;   fill:#8A93A0; text-anchor:middle; font-weight:500; }
+      .lblF { font-size:11.5px; fill:#8A93A0; text-anchor:middle; font-weight:700; paint-order:stroke; stroke:#FFF; stroke-width:4px; stroke-linejoin:round; }
+      .lblT { font-size:11.5px; fill:#C9695A; text-anchor:middle; font-weight:700; paint-order:stroke; stroke:#FFF; stroke-width:4px; stroke-linejoin:round; }
+      .lblN { font-size:11.5px; fill:#7E8896; text-anchor:middle; font-weight:700; paint-order:stroke; stroke:#FFF; stroke-width:4px; stroke-linejoin:round; }
+    </style>
+  </defs>
+  <rect width="100%" height="100%" fill="#FFFFFF"/>
+  <!-- 1단 -->
+  <path class="ln" d="M305,150 L374,150"/>
+  <path class="ln" d="M604,150 L638,150"/>
+  <path class="ln" d="M908,150 L942,150"/>
+  <path class="ln" d="M1172,150 L1206,150"/>
+  <path class="ln" d="M1476,150 L1510,150"/>
+  <path class="ln" d="M1341,202 L1341,268"/>
+  <path class="ln0" d="M1120,182 L1120,250" stroke-dasharray="6 5"/>
+  <path class="ln" d="M773,98 L773.0,85.0 Q773,72 760.0,72.0 L503.0,72.0 Q489,72 489.0,86.0 L489,118"/>
+  <path class="ln" d="M1206,320 L1174.0,320.0 Q1160,320 1160.0,334.0 L1160.0,346.0 Q1160,360 1146.0,360.0 L984.0,360.0 Q970,360 970.0,346.0 L970,182"/>
+  <path class="ln" d="M1341,372 L1341.0,396.0 Q1341,410 1327.0,410.0 L503.0,410.0 Q489,410 489.0,396.0 L489,182"/>
+  <!-- 단 넘김 -->
+  <path class="ln" d="M1625,182 L1625,418"/>
+  <!-- 2단 (오른쪽 → 왼쪽) -->
+  <path class="ln" d="M1490,470 L1456,470"/>
+  <path class="ln" d="M1226,470 L1192,470"/>
+  <path class="ln" d="M922,470 L888,470"/>
+  <path class="ln" d="M658,470 L589,470"/>
+  <path class="ln" d="M1625,522 L1625.0,626.0 Q1625,640 1611.0,640.0 L760,640"/>
+  <path class="ln0" d="M1057,522 L1057,640"/>
+  <circle cx="1057" cy="640" r="4" fill="#B7BDC7"/>
+  <path class="ln" d="M620,608 L620.0,570.0 Q620,556 634.0,556.0 L759.0,556.0 Q773,556 773.0,542.0 L773,502"/>
+  <path class="ln" d="M389,470 L54.0,470.0 Q40,470 40.0,456.0 L40.0,54.0 Q40,40 54.0,40.0 L1043.0,40.0 Q1057,40 1057.0,54.0 L1057,118"/>
+  <!-- 노드 -->
+  <rect x="105" y="126" width="200" height="48" rx="24" fill="#FDECEA" stroke="#F0A99C" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="t" x="205" y="156">대화 시작</text>
+  <rect x="374" y="118" width="230" height="64" rx="16" fill="#EAF2FD" stroke="#A8C5EC" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="t" x="489" y="146">① 웨이크워드 감지</text>
+  <text class="s" x="489" y="165">“모리야” · 0.25초 간격 · score ≥ 0.9</text>
+  <path d="M756.2,104.5 Q773,98 789.8,104.5 L891.2,143.5 Q908,150 891.2,156.5 L789.8,195.5 Q773,202 756.2,195.5 L654.8,156.5 Q638,150 654.8,143.5 Z" fill="#FDF7E7" stroke="#E8CE86" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="d" x="773" y="145">② 방해 금지</text>
+  <text class="d" x="773" y="164">시간대인가?</text>
+  <rect x="942" y="118" width="230" height="64" rx="16" fill="#EAF2FD" stroke="#A8C5EC" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="t" x="1057" y="146">③ 라이브 녹음 + VAD</text>
+  <text class="s" x="1057" y="165">30ms 프레임 · VAD + RMS 게이트</text>
+  <rect x="1005" y="250" width="230" height="64" rx="16" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.7" stroke-dasharray="6 5"/>
+  <text class="t" x="1120" y="278">③-1 감정 샘플링 (병행)</text>
+  <text class="s" x="1120" y="297">0.7초 간격 · 분류 후 프레임 폐기</text>
+  <path d="M1324.2,104.5 Q1341,98 1357.8,104.5 L1459.2,143.5 Q1476,150 1459.2,156.5 L1357.8,195.5 Q1341,202 1324.2,195.5 L1222.8,156.5 Q1206,150 1222.8,143.5 Z" fill="#FDF7E7" stroke="#E8CE86" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="d" x="1341" y="145">④ 말끝 침묵이</text>
+  <text class="d" x="1341" y="164">2초 이어졌는가?</text>
+  <path d="M1324.2,274.5 Q1341,268 1357.8,274.5 L1459.2,313.5 Q1476,320 1459.2,326.5 L1357.8,365.5 Q1341,372 1324.2,365.5 L1222.8,326.5 Q1206,320 1222.8,313.5 Z" fill="#FDF7E7" stroke="#E8CE86" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="d" x="1341" y="315">⑤ 15초 동안</text>
+  <text class="d" x="1341" y="334">발화가 없었는가?</text>
+  <rect x="1510" y="118" width="230" height="64" rx="16" fill="#EAF6EF" stroke="#A2D2BA" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="t" x="1625" y="146">⑥ STT (Whisper-base)</text>
+  <text class="s" x="1625" y="165">무음 트리밍 · 짧은 클립 폐기</text>
+  <path d="M1608.2,424.5 Q1625,418 1641.8,424.5 L1743.2,463.5 Q1760,470 1743.2,476.5 L1641.8,515.5 Q1625,522 1608.2,515.5 L1506.8,476.5 Q1490,470 1506.8,463.5 Z" fill="#FDF7E7" stroke="#E8CE86" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="d" x="1625" y="465">⑦ 규칙(safety.py)에</text>
+  <text class="d" x="1625" y="484">위험 표현이 걸리는가?</text>
+  <rect x="1226" y="438" width="230" height="64" rx="16" fill="#F0EAFB" stroke="#BFAEE6" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="t" x="1341" y="466">⑨ RAG 검색 → LLM</text>
+  <text class="s" x="1341" y="485">top-3 · reply·expression·risk</text>
+  <path d="M1040.2,424.5 Q1057,418 1073.8,424.5 L1175.2,463.5 Q1192,470 1175.2,476.5 L1073.8,515.5 Q1057,522 1040.2,515.5 L938.8,476.5 Q922,470 938.8,463.5 Z" fill="#FDF7E7" stroke="#E8CE86" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="d" x="1057" y="465">⑩ LLM 이 위험을</text>
+  <text class="d" x="1057" y="484">보고했는가?</text>
+  <rect x="480" y="608" width="280" height="64" rx="16" fill="#FCE7E4" stroke="#EE9285" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="t" x="620" y="636">⑧ 정해진 문장으로 응답</text>
+  <text class="s" x="620" y="655">LLM 우회 · 가족에게 즉시 알림</text>
+  <rect x="658" y="438" width="230" height="64" rx="16" fill="#E7F4EE" stroke="#93C9AC" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="t" x="773" y="466">⑪ TTS 재생 + 표정</text>
+  <text class="s" x="773" y="485">가족 목소리 · LCD 표정 동기</text>
+  <rect x="389" y="446" width="200" height="48" rx="24" fill="#FDECEA" stroke="#F0A99C" stroke-width="1.7" filter="url(#sh)"/>
+  <text class="t" x="489" y="476">다음 턴</text>
+  <!-- 분기 -->
+  <text class="lblT" x="773" y="62">True</text>
+  <text class="lblF" x="925" y="137">False</text>
+  <text class="lblT" x="1493" y="138">True</text>
+  <text class="lblF" x="1372" y="240">False</text>
+  <text class="lblF" x="1090" y="352">False</text>
+  <text class="lblT" x="1232" y="400">True · 대화 종료</text>
+  <text class="lblF" x="1473" y="458">False</text>
+  <text class="lblT" x="1652" y="585">True</text>
+  <text class="lblT" x="1084" y="585">True</text>
+  <text class="lblF" x="905" y="458">False</text>
+  <text class="lblN" x="300" y="458">다음 턴</text>
+</svg>

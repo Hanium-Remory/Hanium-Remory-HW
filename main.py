@@ -37,8 +37,7 @@ load_dotenv()
 # ⚙️ 설정값
 # ──────────────────────────────────────────────────────────────────────────────
 PATIENT_ID    = "P001"                       # RAG/chroma_db/ 안에 폴더로 존재해야 함
-WHISPER_MODEL = "small"                      # (참고) 실제 STT 모델은 Hailo .hef 로 정해짐
-# 목록에서 확인된 정확한 이름으로. (계정에 따라 openai/ 접두어가 붙을 수 있음)
+
 GROQ_MODEL    = "openai/gpt-oss-120b"
 # CosyVoice2 TTS 서버(2080). URL/키는 .env로 주입 가능(코드에 고정 X).
 TTS_API_URL   = os.getenv("TTS_API_URL", "http://100.101.194.59:8000/tts")
@@ -52,7 +51,7 @@ DEVICE_ID     = os.getenv("DEVICE_ID", "1")
 DEVICE_TOKEN  = os.getenv("DEVICE_TOKEN", "Fy5JbTV4OFZ9eq6cwoF7cD8IMe1_0aG6le0y0lF1fAM")
 # 약 시간을 몇 초마다 확인할지.
 MEDICATION_CHECK_INTERVAL_SEC = 30
-# 약 알림 후 몇 초 뒤에 "드셨어요?" 하고 복용을 다시 챙겨줄지(기본 15분).
+# 약 알림 후 몇 초 뒤에 "드셨어요?" 하고 복용을 다시 챙겨줄지
 MED_CONFIRM_DELAY_SEC = 15 * 60
 # 연결 신호를 몇 초마다 보낼지. 서버는 600초 넘게 끊기면 '연결 끊김'으로 본다.
 CONNECTION_INTERVAL_SEC = 300
@@ -737,7 +736,7 @@ def main() -> None:
     print(f"  환자 ID: {PATIENT_ID}")
     print("=" * 50)
 
-    stt           = STTHandler(model_size=WHISPER_MODEL)
+    stt           = STTHandler()
 
     # 대화 내용 저장기(백엔드가 나중에 파일에서 가져감)
     conv_logger   = ConversationLogger(
