@@ -20,7 +20,7 @@ _HALLUCINATIONS = {
 class STTHandler:
     # whisper-small.hef는 language 파라미터를 무시하고 영어로 번역 출력하는
     # 알려진 버그가 있어(Hailo GenAI Model Zoo v5.2.0~5.3.0). base는 정상.
-    def __init__(self, hef_path="/home/han/hailo_models/whisper-base.hef"):
+    def __init__(selfㄴ, hef_path="/home/han/hailo_models/whisper-base.hef"):
         print("STT(HAT) 모델 로딩 중...")
         self.vdevice = VDevice()
         self.s2t = Speech2Text(self.vdevice, hef_path)
