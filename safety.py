@@ -10,8 +10,10 @@
     규칙은 네트워크와 무관하다.
 
 규칙은 적어 둔 표현만 안다. 처음 보는 어법은 새어 나가므로, 놓친 것은 LLM 이
-받는다(from_llm). 대화를 만드는 그 호출에 필드 하나를 얹는 것이라 왕복이
-늘지 않는다. 어느 쪽이 잡았든 그다음 대응은 같다.
+받는다(escalate). 대화를 만드는 그 호출에 필드 하나를 얹는 것이라 왕복이
+늘지 않는다. 규칙이 무언가를 잡았더라도 LLM 이 더 급한 것을 보면 그쪽으로
+올린다 — "씨발 그냥 자다가 안 깨어났으면" 을 규칙은 거친 말로만 본다.
+고정 응답과 알림은 어느 쪽이 잡았든 같다.
 
 가려낸 뒤 하는 일은 종류마다 다르다.
 
@@ -94,7 +96,8 @@ _MEDICAL = [
 # 학대로 잡히던 것을 막는다.
 _ABUSE = [
     r"때렸", r"때려(?!\s*치)", r"때리(?!\s*치)",
-    r"밥\S*\s*안\s*주", r"굶기",
+    # '주-' 만 보면 "밥도 안 줘", "안 줬어" 를 놓친다. 활용형을 함께 받는다.
+    r"밥\S*\s*안\s*(주|줘|줬)", r"굶기",
     r"가둬", r"가뒀", r"내쫓", r"돈\S*\s*가져가",
 ]
 
@@ -171,6 +174,9 @@ def _abuse(matched: str) -> Risk:
     )
 
 
+# 심각도 순. classify 가 규칙을 보는 순서와 같다.
+_SEVERITY = [SELF_HARM, HARM_OTHERS, MEDICAL, ABUSE, PROFANITY]
+
 _BUILDERS = {
     SELF_HARM: _self_harm,
     HARM_OTHERS: _harm_others,
@@ -187,6 +193,22 @@ def from_llm(kind: Optional[str]) -> Optional[Risk]:
     """
     builder = _BUILDERS.get(kind or "")
     return builder("LLM") if builder else None
+
+
+def escalate(rule: Optional[Risk], llm_kind: Optional[str]) -> Optional[Risk]:
+    """LLM 판정이 규칙 판정보다 급하면 그 Risk 를, 아니면 None 을 준다.
+
+    규칙의 우선순위는 규칙끼리만 통한다. 규칙이 약한 쪽(거친 말·의료)을
+    먼저 잡았다고 LLM 이 본 자해를 버리면, 가장 비싼 실수를 우선순위가
+    만들어 내는 셈이다. 반대로 LLM 이 더 약하게 봤다고 규칙 판정을 낮추지는
+    않는다.
+    """
+    llm = from_llm(llm_kind)
+    if llm is None:
+        return None
+    if rule is None or _SEVERITY.index(llm.kind) < _SEVERITY.index(rule.kind):
+        return llm
+    return None
 
 
 def classify(text: str) -> Optional[Risk]:

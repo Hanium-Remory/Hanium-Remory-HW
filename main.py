@@ -910,9 +910,11 @@ def main() -> None:
                     print(f"⚠️  RAG 검색 실패(데이터 없음?): {e}")
                     context = ""
 
-            # ④ LLM. 정해진 말로 답해야 하는 자리(자해·의료)는 거치지 않는다 —
-            #    무슨 말이 나올지 모르는 채로 둘 수 없는 순간이다.
-            if risk and risk.reply:
+            # ④ LLM. 자해만 거치지 않는다 — 무슨 말이 나올지 모르는 채로 둘 수
+            #    없는 순간이고, 그보다 급한 판정은 없어서 LLM 에 물을 것도 없다.
+            #    나머지는 규칙이 잡았더라도 LLM 을 불러 더 급한 신호가 있는지 본다
+            #    ("씨발 그냥 자다가 안 깨어났으면" 은 규칙상 거친 말일 뿐이다).
+            if risk and risk.kind == safety.SELF_HARM:
                 reply, robot_expr = risk.reply, risk.expression
                 timings["LLM"] = 0.0
             else:
@@ -923,20 +925,21 @@ def main() -> None:
                     )
                 reply, robot_expr = llm_out["reply"], llm_out["expression"]
 
-                # 규칙이 놓친 낯선 어법은 LLM 이 받는다. 규칙은 적어 둔
-                # 표현만 알기 때문이다. 잡힌 뒤의 대응은 어느 쪽이 잡았든 같다.
-                if risk is None:
-                    risk = safety.from_llm(llm_out.get("risk"))
-                    if risk:
-                        print(f"🛡️  안전 신호(LLM): {risk.kind}")
-                        threading.Thread(
-                            target=report_safety,
-                            args=(risk.kind, user_text),
-                            daemon=True,
-                        ).start()
-                        # 정해진 말이 있는 종류는 모델이 쓴 답 대신 그걸 쓴다.
-                        if risk.reply:
-                            reply, robot_expr = risk.reply, risk.expression
+                # 규칙이 놓쳤거나 약하게 본 것을 LLM 이 더 급하게 봤으면 올린다.
+                upgraded = safety.escalate(risk, llm_out.get("risk"))
+                if upgraded:
+                    print(f"🛡️  안전 신호(LLM): {upgraded.kind}"
+                          + (f" ← {risk.kind}" if risk else ""))
+                    threading.Thread(
+                        target=report_safety,
+                        args=(upgraded.kind, user_text),
+                        daemon=True,
+                    ).start()
+                    risk = upgraded
+
+                # 정해진 말이 있는 종류(자해·타해·의료)는 모델이 쓴 답 대신 그걸 쓴다.
+                if risk and risk.reply:
+                    reply, robot_expr = risk.reply, risk.expression
             print(f"🐻 모리: {reply}    [표정: {robot_expr}]")
 
             # 말이 나가는 걸 늦추지 않도록 따로 보낸다.
