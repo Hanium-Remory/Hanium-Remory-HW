@@ -1,6 +1,7 @@
 # 가상환경
 mori_app/.venv/
 .venv/
+venv/
 
 # 파이썬 캐시
 __pycache__/
@@ -36,3 +37,6 @@ conversations/
 
 # macOS
 .DS_Store
+
+# 모델 비교 평가 (저장소에 올리지 않음)
+eval/
