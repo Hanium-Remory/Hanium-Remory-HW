@@ -96,7 +96,12 @@ sys.path.insert(0, str(ROOT / "rag"))
 sys.path.insert(0, str(ROOT / "emotion"))
 sys.path.insert(0, str(ROOT / "face"))
 
-from stt4vad_hat import STTHandler              # noqa: E402
+# STT 엔진 선택: hailo(온디바이스 whisper) | clova(NAVER CLOVA CSR)
+STT_ENGINE = os.getenv("STT_ENGINE", "hailo").lower()
+if STT_ENGINE == "clova":
+    from stt_clova import ClovaSTTHandler as STTHandler   # noqa: E402
+else:
+    from stt4vad_hat import STTHandler              # noqa: E402
 from retriever import build_context_prompt  # noqa: E402
 from conversation_log import ConversationLogger  # noqa: E402
 
