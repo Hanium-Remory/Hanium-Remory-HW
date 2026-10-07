@@ -64,6 +64,8 @@ PHOTO_DISPLAY_SEC = 30
 RAG_SYNC_INTERVAL_SEC = 300
 # 스피커 볼륨 조절용 ALSA 컨트롤 이름 (amixer scontrols 로 확인)
 AUDIO_CONTROL = os.getenv("AUDIO_CONTROL", "PCM")
+# 볼륨을 바꿀 카드. audio_out.SPEAKER_ALSA_DEVICE 와 같은 USB 스피커여야 한다(aplay -l 로 확인).
+AUDIO_CARD    = os.getenv("AUDIO_CARD", "UACDemoV10")
 # 서버에서 읽어온 최신 설정 캐시
 # spk_id: 기본 목소리의 화자 id(등록한 가족 음성). None 이면 서버 기본 목소리로 말함.
 device_settings = {"dnd": None, "volume": None, "spk_id": None}
@@ -639,7 +641,14 @@ def rag_sync_worker(vision_model):
 def apply_volume(vol):
     """스피커 볼륨을 vol(%)로 설정 (ALSA amixer)."""
     try:
-        subprocess.run(["amixer", "-q", "sset", AUDIO_CONTROL, f"{int(vol)}%"], check=False)
+        # 카드를 지정하지 않으면 default 카드(HDMI)의 PCM 이 바뀌어 스피커엔 반영이 안 된다.
+        r = subprocess.run(
+            ["amixer", "-q", "-c", AUDIO_CARD, "sset", AUDIO_CONTROL, f"{int(vol)}%"],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            print(f"⚠️  볼륨 설정 실패(card={AUDIO_CARD}, {AUDIO_CONTROL}): {r.stderr.strip()}")
+            return
         print(f"🔊 볼륨 {vol}% 적용")
     except Exception as e:
         print(f"⚠️  볼륨 설정 실패: {e}")
