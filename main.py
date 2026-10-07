@@ -9,7 +9,7 @@ main.py
                                    └─▶ [LCD에 로봇 표정 표시]
 
     + [약 복용 시간 백그라운드 알림]
-    + [가족 채팅 전달: 글=TTS, 사진=화면]
+    + [가족 채팅 전달: 글=TTS, 사진=화면] → [어르신 답장: 말씀을 받아 적어 대화방에 올림]
     + [대화중/연결중 상태 보고]
 
 실행:
@@ -66,6 +66,9 @@ CONNECTION_INTERVAL_SEC = 300
 SETTINGS_SYNC_INTERVAL_SEC = 60
 # 가족 채팅을 몇 초마다 확인할지
 CHAT_CHECK_INTERVAL_SEC = 15
+# 가족 메시지를 읽어드린 뒤 답장을 몇 초까지 기다릴지. 말씀을 시작하시면
+# 끝날 때까지 듣는다(이 시간은 '시작' 을 기다리는 시간이다).
+REPLY_WAIT_SEC = 8
 # 가족 사진을 화면에 몇 초 동안 보여줄지
 PHOTO_DISPLAY_SEC = 30
 # 어르신 추억(RAG)을 백엔드에서 몇 초마다 동기화할지
@@ -81,6 +84,12 @@ device_settings = {"dnd": None, "volume": None, "spk_id": None}
 speaker_lock = threading.Lock()
 # 사용자가 말하는 중(녹음)인지. 채팅 알림을 이 동안엔 미룬다(그 턴 끝나면 전달).
 recording = threading.Event()
+
+# 가족 메시지를 읽어드린 뒤 답장을 받아 달라는 요청. 채팅 워커가 넣고 메인
+# 루프가 꺼내 녹음한다 — 마이크는 메인 루프만 쓴다(웨이크워드 대기가 마이크를
+# 쥐고 있어 다른 스레드가 열면 부딪친다). reply_wake 는 웨이크워드 대기를 끊는다.
+reply_requests: "queue.Queue[dict]" = queue.Queue()
+reply_wake = threading.Event()
 
 # 마이크 디바이스 인덱스. None이면 시스템 default 입력 사용(권장).
 MIC_DEVICE_INDEX = None
@@ -545,18 +554,21 @@ def _restore_photo_if_any(face) -> None:
         _show_photo_for_a_while(face, url)
 
 
+def _sender_label(m: dict) -> str:
+    """보낸 사람 호칭: "딸 박수진". 관계가 없으면 이름만, 정보가 없으면 "가족"."""
+    relation = (m.get("senderRelation") or "").strip()
+    name = (m.get("senderName") or "").strip()
+    if name:
+        return f"{relation} {name}".strip()
+    return "가족"
+
+
 def _deliver_chat(m: dict, face=None) -> None:
     """가족 메시지 하나를 인형이 전한다. 글=TTS, 사진=화면(PHOTO_DISPLAY_SEC 초)."""
     content = (m.get("content") or "").strip()
     image_url = m.get("imageUrl")
 
-    # 보낸 사람 호칭 만들기: "딸 박수진" → "딸 박수진에게서". 정보 없으면 "가족".
-    relation = (m.get("senderRelation") or "").strip()
-    name = (m.get("senderName") or "").strip()
-    if name:
-        sender = f"{relation} {name}".strip()   # 관계 없으면 이름만
-    else:
-        sender = "가족"
+    sender = _sender_label(m)
 
     # 사용자가 말하는 중이면 그 턴이 끝날 때까지 기다린다(사용자 말을 끊지 않음).
     while recording.is_set():
@@ -594,6 +606,110 @@ def _deliver_chat(m: dict, face=None) -> None:
             print(f"⚠️  사진 표시 실패: {e}")
 
 
+def _take_reply_request() -> dict | None:
+    """쌓인 답장 요청을 꺼낸다. 여러 개면 마지막 것 하나만 — 한 번 여쭈면 된다.
+
+    신호를 먼저 끄고 큐를 비운다. 반대로 하면 그 사이에 들어온 요청이 신호
+    없이 큐에 남아, 다음 웨이크워드까지 기다리게 된다.
+    """
+    reply_wake.clear()
+    req = None
+    while True:
+        try:
+            req = reply_requests.get_nowait()
+        except queue.Empty:
+            break
+    return req
+
+
+def post_elder_reply(text: str, wav_path: str | None = None) -> bool:
+    """받아 적은 답장을 말씀하신 목소리와 함께 가족 대화방에 올린다.
+
+    녹음을 못 읽으면 글만 올린다 — 목소리가 없어도 답장은 전해져야 한다.
+    """
+    files = None
+    if wav_path:
+        try:
+            with open(wav_path, "rb") as f:
+                files = {"audio": ("reply.wav", f.read(), "audio/wav")}
+        except OSError as e:
+            print(f"⚠️  답장 녹음을 읽지 못함(글만 보냄): {e}")
+    try:
+        r = requests.post(
+            f"{REMORY_API}/devices/{DEVICE_ID}/chat/reply",
+            data={"content": text},
+            files=files,
+            headers={"X-Device-Token": DEVICE_TOKEN},
+            timeout=30,
+        )
+        return r.status_code == 201
+    except Exception as e:
+        print(f"⚠️  답장 올리기 실패: {e}")
+        return False
+
+
+def listen_for_reply(req: dict, stt, mic_wav: str, face=None) -> None:
+    """가족 메시지를 읽어드린 뒤 답장을 여쭙고, 말씀하시면 대화방에 올린다.
+
+    받아 적은 글과 말씀하신 목소리를 함께 올린다. 말씀이 없으면 조용히
+    넘어간다 — 답장은 하셔도 되고 안 하셔도 된다.
+    """
+    sender = req.get("sender") or "가족"
+
+    with speaker_lock:
+        if face:
+            face.show_notice("답장하실 말씀이 있으면 해 주세요", f"{sender}에게", icon="message")
+        try:
+            # 목소리가 그대로 간다는 걸 미리 말씀드린다.
+            speak(
+                f"{sender}에게 답장하시려면 지금 말씀해 주세요. "
+                "목소리 그대로 보내드릴게요."
+            )
+        finally:
+            if face:
+                face.hide_notice()
+
+    recorder = LiveRecorder(
+        input_device_index=MIC_DEVICE_INDEX,
+        silence_end_ms=MIC_SILENCE_END_MS,
+    )
+    recording.set()
+    if face:
+        face.listen_start()
+    try:
+        wav_path = recorder.record_until_silence(
+            mic_wav, max_wait_seconds=REPLY_WAIT_SEC
+        )
+    finally:
+        recording.clear()
+        if face:
+            face.listen_stop()
+
+    if wav_path is None:
+        print("💌 답장 없음")
+        return
+
+    text, _ = stt.transcribe(wav_path)
+    text = (text or "").strip()
+    print(f"💌 어르신 답장: {text}")
+    if not text:
+        return
+
+    # 답장에도 힘든 마음이 담길 수 있다. 대화와 같은 기준으로 알린다.
+    risk = safety.classify(text)
+    if risk:
+        threading.Thread(
+            target=report_safety, args=(risk.kind, text), daemon=True
+        ).start()
+
+    sent = post_elder_reply(text, wav_path)
+    with speaker_lock:
+        speak(
+            f"{sender}에게 답장을 보냈어요." if sent
+            else "답장을 보내지 못했어요. 조금 뒤에 다시 해 주세요."
+        )
+
+
 def chat_worker(face=None) -> None:
     """가족이 보낸 메시지(글·사진)를 받아 인형이 전한다."""
     headers = {"X-Device-Token": DEVICE_TOKEN}
@@ -612,6 +728,11 @@ def chat_worker(face=None) -> None:
                     f"{REMORY_API}/devices/{DEVICE_ID}/chat/delivered",
                     json={"messageIds": ids}, headers=headers, timeout=30,
                 )
+                # 다 읽어드렸으면 답장을 받아 달라고 메인 루프에 부탁한다.
+                # 방해 금지 시간에는 말씀을 청하지 않는다.
+                if not in_dnd(device_settings["dnd"]):
+                    reply_requests.put({"sender": _sender_label(msgs[-1])})
+                    reply_wake.set()
         except Exception as e:
             print(f"⚠️  채팅 전달 오류: {e}")
         time.sleep(CHAT_CHECK_INTERVAL_SEC)
@@ -841,11 +962,19 @@ def main() -> None:
 
     while True:
         try:
+            # 가족 메시지를 읽어드린 뒤라면 답장부터 여쭙는다.
+            reply_req = _take_reply_request()
+            if reply_req:
+                listen_for_reply(reply_req, stt, mic_wav, face)
+                continue
+
             if not conversation_active:
                 if face:
                     face.set_expression("평온")
 
-                wakeword_detector.wait_for_wakeword()
+                # 답장 요청이 오면 웨이크워드 대기를 끊고 위로 돌아가 받는다.
+                if not wakeword_detector.wait_for_wakeword(stop_event=reply_wake):
+                    continue
                 dnd = device_settings["dnd"]
                 if in_dnd(dnd) and not (dnd or {}).get("allowWakeWord", True):
                     print("🔕 방해 금지 시간 — 조용히 대기")

@@ -212,10 +212,13 @@ class MoriyaWakeWordDetector:
 
         return float(score)
 
-    def wait_for_wakeword(self) -> bool:
+    def wait_for_wakeword(self, stop_event=None) -> bool:
         """
         "모리야"가 감지될 때까지 마이크를 듣습니다.
         감지되면 True를 반환합니다.
+
+        stop_event 가 켜지면 마이크를 놓고 False 를 돌려줍니다. 다른 일(가족
+        메시지 답장 녹음 등)이 마이크를 써야 할 때 기다림을 끊는 데 씁니다.
         """
 
         audio_queue = queue.Queue()
@@ -242,6 +245,9 @@ class MoriyaWakeWordDetector:
             device=self.input_device_index,
         ):
             while True:
+                if stop_event is not None and stop_event.is_set():
+                    return False
+
                 try:
                     chunk = audio_queue.get(timeout=1.0)
                 except queue.Empty:
