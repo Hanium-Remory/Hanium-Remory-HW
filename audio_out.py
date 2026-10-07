@@ -116,7 +116,7 @@ def play_wav(path: str) -> None:
         ) from e
 
 
-def synthesize_and_play_stream(text, url, key, sample_rate=24000, buffer_bytes=96000,
+def synthesize_and_play_stream(text, url, key, sample_rate=24000, buffer_bytes=48000,
                                on_start=None, spk_id=None):
     """PCM을 백그라운드 스레드로 미리 받아 쌓아두고 재생. 네트워크 흔들림을 흡수한다.
 
