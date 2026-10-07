@@ -40,8 +40,16 @@ PATIENT_ID    = "P001"                       # RAG/chroma_db/ 안에 폴더로 �
 
 GROQ_MODEL    = "openai/gpt-oss-120b"
 # CosyVoice2 TTS 서버(2080). URL/키는 .env로 주입 
-TTS_STREAM_API_URL = os.environ["TTS_STREAM_API_URL"]
-TTS_API_KEY   = os.environ["TTS_API_KEY"]
+# TTS 엔진 선택: cosyvoice(자체 서버) | fish(Fish Audio 클라우드)
+TTS_ENGINE    = os.getenv("TTS_ENGINE", "cosyvoice").lower()
+if TTS_ENGINE == "fish":
+    FISH_API_KEY      = os.environ["FISH_API_KEY"]
+    FISH_REFERENCE_ID = os.getenv("FISH_REFERENCE_ID")   # 없으면 Fish 기본 목소리
+    FISH_MODEL        = os.getenv("FISH_MODEL")          # 없으면 Fish 기본 모델
+    FISH_LATENCY      = os.getenv("FISH_LATENCY", "balanced")
+else:
+    TTS_STREAM_API_URL = os.environ["TTS_STREAM_API_URL"]
+    TTS_API_KEY   = os.environ["TTS_API_KEY"]
 RAG_TOP_K     = 3
 
 # ── 백엔드(ReMory 서버) 연결 ──────────────────────────────────
@@ -109,7 +117,7 @@ from conversation_log import ConversationLogger  # noqa: E402
 
 from groq import Groq                        # noqa: E402
 from mic_vad import LiveRecorder            # noqa: E402
-from audio_out import play_wav, synthesize_and_play_stream   # noqa: E402
+from audio_out import play_wav, synthesize_and_play_stream, synthesize_and_play_fish   # noqa: E402
 from wakeword import MoriyaWakeWordDetector
 try:
     from emotion_service import EmotionService   # noqa: E402
@@ -265,8 +273,20 @@ def speak(text: str) -> None:
 
     기본 목소리로 지정된 화자(device_settings["spk_id"])로 말한다. None 이면 서버 기본.
     """
-    synthesize_and_play_stream(text, TTS_STREAM_API_URL, TTS_API_KEY,
-                               spk_id=device_settings.get("spk_id"))
+    tts_play(text)
+
+
+def tts_play(text: str, on_start=None) -> None:
+    """TTS_ENGINE 에 맞는 엔진으로 text 를 합성하며 바로 재생한다."""
+    if TTS_ENGINE == "fish":
+        # 가족 목소리(spk_id)는 CosyVoice 서버에만 등록돼 있어 Fish 에선 쓰지 않는다.
+        synthesize_and_play_fish(text, FISH_API_KEY, reference_id=FISH_REFERENCE_ID,
+                                 model=FISH_MODEL, latency=FISH_LATENCY,
+                                 on_start=on_start)
+    else:
+        synthesize_and_play_stream(text, TTS_STREAM_API_URL, TTS_API_KEY,
+                                   spk_id=device_settings.get("spk_id"),
+                                   on_start=on_start)
 
 
 def connection_worker() -> None:
@@ -963,11 +983,8 @@ def main() -> None:
             try:
                 with speaker_lock:
                     with timed("TTS 스트리밍", timings):
-                        synthesize_and_play_stream(
+                        tts_play(
                             reply,
-                            TTS_STREAM_API_URL,
-                            TTS_API_KEY,
-                            spk_id=device_settings.get("spk_id"),
                             on_start=(face.start_speaking if face else None),
                         )
             finally:
