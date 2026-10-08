@@ -132,7 +132,7 @@ def synthesize_and_play_stream(text, url, key, sample_rate=24000, buffer_bytes=4
 
 
 def synthesize_and_play_fish(text, key, reference_id=None, model=None,
-                             sample_rate=24000, buffer_bytes=48000,
+                             sample_rate=24000, buffer_bytes=24000,
                              latency="balanced", on_start=None):
     """Fish Audio 클라우드 TTS(https://api.fish.audio/v1/tts)로 스트리밍 재생.
 

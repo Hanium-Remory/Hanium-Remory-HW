@@ -100,7 +100,7 @@ WAKEWORD_THRESHOLD = 0.9
 CONVERSATION_IDLE_TIMEOUT_SEC = 15
 
 # 발화 종료 판단: 말끝 뒤로 이만큼 '연속 침묵'이 이어지면 끝으로 봄(ms).
-MIC_SILENCE_END_MS = 2000
+MIC_SILENCE_END_MS = 1500
 
 # ⏱️ 타이밍 리포트에 표시할 단계 순서.
 TIMING_ORDER = ["녹음+VAD", "STT", "RAG", "LLM", "TTS 합성", "TTS 재생"]
