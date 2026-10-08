@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 load_dotenv()
 os.environ["TTS_ENGINE"] = "fish"
 os.environ.setdefault("FISH_REFERENCE_ID", "c2045f5c866b4222a4a2c30b5b051f7e")
+# 모델을 안 정하면 유료 기본 모델(s2.1-pro)로 가서 API 크레딧이 없으면 402 가 난다.
+os.environ.setdefault("FISH_MODEL", "s2.1-pro-free")
 
 import main  # noqa: E402
 
