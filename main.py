@@ -258,6 +258,7 @@ def chat_with_memory(client: Groq, user_text: str, context: str,
         temperature=0.8,
         max_tokens=1024,
         response_format={"type": "json_object"},
+        reasoning_effort="low"
     )
 
     import json
