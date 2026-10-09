@@ -1,0 +1,9 @@
+# 학습용 (Mac/PC). 파이에는 설치하지 않는다 — 파이는 onnxruntime 만 있으면 됨.
+torch>=2.4
+torchvision>=0.19
+timm>=1.0
+opencv-python
+onnx
+onnxruntime
+scikit-learn
+tqdm

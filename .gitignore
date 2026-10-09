@@ -8,10 +8,11 @@ __pycache__/
 *.pyc
 
 # 모델 파일
-models/*.onnx
+models/*
 logs/
 audio/
-models/
+# 단, 우리가 학습한 감정 모델은 파이가 git pull 로 받도록 올린다(16MB)
+!models/emotion_ko5.onnx
 
 # 테스트 출력 이미지
 *.jpg
@@ -40,3 +41,6 @@ conversations/
 
 # 모델 비교 평가 (저장소에 올리지 않음)
 eval/
+
+# 감정 모델 학습 데이터 (AI Hub 얼굴 사진 — 커밋 금지)
+emotion/train/data/

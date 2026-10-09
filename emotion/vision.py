@@ -1,16 +1,19 @@
 """
-비전 파이프라인: 카메라 → 얼굴 검출(YuNet) → crop → 감정 분류(HSEmotion).
+비전 파이프라인: 카메라 → 얼굴 검출(YuNet) → crop → 감정 분류.
 
 - 얼굴 검출: cv2.FaceDetectorYN (YuNet). 가볍고 각도/측면에 비교적 강함.
-- 감정 분류: HSEmotion(EmotiEffLib) — AffectNet 학습 EfficientNet-B0. FER+보다 정확.
-  ※ HSEmotion은 RGB 컬러 입력을 받음(내부에서 224로 리사이즈 + ImageNet 정규화).
+- 감정 분류: models/ 에 직접 학습한 모델(config.CUSTOM_EMOTION_PATH)이 있으면 그것,
+  없으면 HSEmotion(AffectNet 8감정 EfficientNet-B0).
+  ※ 둘 다 RGB 입력, 224 리사이즈 + ImageNet 정규화. crop/전처리는 face_crop.py 공용.
 원본 이미지는 저장하지 않고 메모리에서만 처리합니다.
 """
+import os
+
 import cv2
 import numpy as np
-from hsemotion_onnx.facial_emotions import HSEmotionRecognizer
 
 import config
+import face_crop
 
 
 class Camera:
@@ -37,50 +40,58 @@ class Camera:
             pass
 
 
-class EmotionAnalyzer:
-    """YuNet으로 얼굴을 찾고 HSEmotion으로 감정을 분류."""
+class _HSEmotionClassifier:
+    """HSEmotion(AffectNet 8감정). 모델은 ~/.hsemotion/ 에서 로드."""
 
     def __init__(self):
-        self._detector = cv2.FaceDetectorYN.create(
-            config.YUNET_PATH, "", (320, 320),
-            config.FACE_SCORE_THRESHOLD, config.FACE_NMS_THRESHOLD, 5000,
-        )
-        # 감정 분류기 (AffectNet 학습). 모델은 ~/.hsemotion/ 에서 로드.
+        from hsemotion_onnx.facial_emotions import HSEmotionRecognizer
         self._fer = HSEmotionRecognizer(model_name=config.HSEMOTION_MODEL)
 
-    def _detect_largest_face(self, frame_bgr):
-        """가장 큰 얼굴 1개의 (x, y, w, h, score). 없으면 None."""
-        h, w = frame_bgr.shape[:2]
-        self._detector.setInputSize((w, h))
-        _, faces = self._detector.detect(frame_bgr)
-        if faces is None or len(faces) == 0:
-            return None
-        faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-        x, y, fw, fh = faces[0][:4]
-        return int(x), int(y), int(fw), int(fh), float(faces[0][14])
-
-    def _classify(self, face_bgr):
-        """crop된 얼굴(BGR) → (label, confidence). HSEmotion은 RGB 입력."""
-        face_rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
+    def __call__(self, face_rgb):
         label, scores = self._fer.predict_emotions(face_rgb, logits=False)
         return label, float(np.max(scores))
 
+
+class _CustomClassifier:
+    """emotion/train/ 으로 직접 학습해 내보낸 ONNX. 라벨은 모델 메타데이터에 들어 있다."""
+
+    def __init__(self, path):
+        import onnxruntime as ort
+        self._sess = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
+        self._input = self._sess.get_inputs()[0].name
+        meta = self._sess.get_modelmeta().custom_metadata_map
+        self.labels = meta["labels"].split(",") if "labels" in meta else config.CUSTOM_EMOTION_LABELS
+
+    def __call__(self, face_rgb):
+        x = face_crop.to_input(face_rgb)[None]
+        probs = face_crop.softmax(self._sess.run(None, {self._input: x})[0][0])
+        i = int(np.argmax(probs))
+        return self.labels[i], float(probs[i])
+
+
+class EmotionAnalyzer:
+    """YuNet으로 얼굴을 찾고 감정을 분류."""
+
+    def __init__(self):
+        self._detector = face_crop.create_detector(
+            config.YUNET_PATH, config.FACE_SCORE_THRESHOLD, config.FACE_NMS_THRESHOLD,
+        )
+        if os.path.exists(config.CUSTOM_EMOTION_PATH):
+            self._fer = _CustomClassifier(config.CUSTOM_EMOTION_PATH)
+            print(f"🙂 감정 모델: 직접 학습 ({'/'.join(self._fer.labels)})")
+        else:
+            self._fer = _HSEmotionClassifier()
+            print("🙂 감정 모델: HSEmotion (AffectNet 8감정)")
+
     def analyze_frame(self, frame_bgr):
         """프레임 1장 → (label, confidence) 또는 None(얼굴 없음)."""
-        det = self._detect_largest_face(frame_bgr)
+        det = face_crop.detect_largest_face(self._detector, frame_bgr)
         if det is None:
             return None
-        x, y, fw, fh, _ = det
-        # 정사각형으로 확장 + 여백 → 비율 왜곡 없이 crop.
-        cx, cy = x + fw / 2.0, y + fh / 2.0
-        half = int(max(fw, fh) * 0.65)
-        H, W = frame_bgr.shape[:2]
-        x1, y1 = max(0, int(cx - half)), max(0, int(cy - half))
-        x2, y2 = min(W, int(cx + half)), min(H, int(cy + half))
-        face = frame_bgr[y1:y2, x1:x2]
-        if face.size == 0:
+        face = face_crop.crop_square(frame_bgr, det)
+        if face is None:
             return None
-        return self._classify(face)
+        return self._fer(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
 
     def best_emotion(self, frames):
         """
