@@ -20,7 +20,7 @@ FACE_SCORE_THRESHOLD = 0.5
 FACE_NMS_THRESHOLD   = 0.3
 
 # ── 감정 라벨 ─────────────────────────────────────────────
-# 지금 로드한 모델에 맞는 블록 '하나만' 활성화.
+# [A] HSEmotion 라벨. [B] 모델이 있으면 그쪽 라벨이 우선.
 
 # [A] 지금 — HSEmotion (AffectNet 8감정). 데모용, FER+보다 정확.
 EMOTION_LABELS = ["Anger", "Contempt", "Disgust", "Fear",
@@ -28,6 +28,8 @@ EMOTION_LABELS = ["Anger", "Contempt", "Disgust", "Fear",
 EMOTION_KO = {"Anger": "분노", "Contempt": "못마땅함", "Disgust": "불쾌", "Fear": "두려움",
               "Happiness": "기쁨", "Neutral": "중립", "Sadness": "슬픔", "Surprise": "놀람"}
 
-# [B] 나중 — 한국형 7감정 (AI Hub 82). 직접 학습한 모델 쓸 때 위 [A] 주석처리 후 활성화.
-# EMOTION_LABELS = ["기쁨", "당황", "분노", "불안", "상처", "슬픔", "중립"]
-# EMOTION_KO = {e: e for e in EMOTION_LABELS}
+# [B] 직접 학습한 5감정 모델 (emotion/train/). 아래 파일이 있으면 vision.py 가
+#     [A] 대신 자동으로 이 모델을 쓴다. 라벨은 ONNX 메타데이터에 같이 들어 있고,
+#     아래 목록은 메타데이터가 없을 때만 쓰는 예비값. 한글 라벨 그대로 백엔드로 간다.
+CUSTOM_EMOTION_PATH   = os.path.join(MODELS_DIR, "emotion_ko5.onnx")
+CUSTOM_EMOTION_LABELS = ["기쁨", "슬픔", "분노", "불안", "중립"]
